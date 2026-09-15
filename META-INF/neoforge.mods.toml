@@ -1,0 +1,25 @@
+modLoader="javafml"
+loaderVersion="[3,]"
+issueTrackerURL="https://github.com/neoforged/NeoForge/issues"
+license="LGPL v2.1"
+
+[[mods]]
+    modId="neoforge"
+    # We use the global NeoForge version
+    version="26.2.0.77"
+    #updateJSONURL="https://maven.neoforged.net/releases/net/neoforged/forge/promotions_slim.json"
+    displayName="NeoForge"
+    credits="Everyone who contributed on GitHub and supports our development"
+    authors="The NeoForged Team"
+    description="A free, open-source, community-oriented modding API for Minecraft: Java Edition."
+    displayURL="https://neoforged.net"
+    bannerFile="neoforge_logo.png"
+    iconFile="neoforge_icon.png"
+
+[[mixins]]
+    config = "neoforge.mixins.json"
+
+[[accessTransformers]]
+    file="META-INF/accesstransformer.cfg"
+[[accessTransformers]]
+    file="META-INF/accesstransformergenerated.cfg"

@@ -1,0 +1,6 @@
+{
+    "textures":  {
+                     "layer0":  "lingua_universalis:item/speculum_scientiae"
+                 },
+    "parent":  "minecraft:item/generated"
+}

@@ -1,0 +1,6 @@
+{
+    "textures":  {
+                     "all":  "lingua_universalis:block/cubile_araneae"
+                 },
+    "parent":  "minecraft:block/cube_all"
+}

@@ -1,0 +1,6 @@
+{
+    "textures":  {
+                     "all":  "lingua_universalis:block/scriptorium"
+                 },
+    "parent":  "minecraft:block/cube_all"
+}

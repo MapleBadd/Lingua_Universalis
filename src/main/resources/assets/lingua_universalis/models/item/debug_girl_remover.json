@@ -1,0 +1,6 @@
+{
+    "textures":  {
+                     "layer0":  "lingua_universalis:item/debug_girl_remover"
+                 },
+    "parent":  "minecraft:item/generated"
+}

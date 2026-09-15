@@ -1,0 +1,13 @@
+// Lingua Universalis - init script that dumps the real runtime classpath (what runClient loads).
+// Usage:
+//   gradlew.bat --offline -q --no-configuration-cache --init-script tools/dump-runtime-classpath.gradle luDumpRunCp
+gradle.projectsEvaluated {
+    def p = gradle.rootProject
+    p.tasks.register('luDumpRunCp') {
+        doLast {
+            println 'LU_RUNCP_START'
+            println p.sourceSets.main.runtimeClasspath.asPath
+            println 'LU_RUNCP_END'
+        }
+    }
+}

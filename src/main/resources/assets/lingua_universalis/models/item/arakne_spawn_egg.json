@@ -1,0 +1,6 @@
+{
+    "textures":  {
+                     "layer0":  "lingua_universalis:item/arakne_spawn_egg"
+                 },
+    "parent":  "minecraft:item/generated"
+}

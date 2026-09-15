@@ -1,0 +1,6 @@
+{
+    "textures":  {
+                     "layer0":  "lingua_universalis:item/fatum_filum"
+                 },
+    "parent":  "minecraft:item/generated"
+}

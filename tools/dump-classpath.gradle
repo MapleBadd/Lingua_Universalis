@@ -1,0 +1,13 @@
+// Lingua Universalis - init script that dumps the real main compile classpath.
+// Usage:
+//   gradlew.bat --offline -q --no-configuration-cache --init-script tools/dump-classpath.gradle luDumpCp > build/lu-compile-classpath.txt
+gradle.projectsEvaluated {
+    def p = gradle.rootProject
+    p.tasks.register('luDumpCp') {
+        doLast {
+            println 'LU_CP_START'
+            println p.sourceSets.main.compileClasspath.asPath
+            println 'LU_CP_END'
+        }
+    }
+}

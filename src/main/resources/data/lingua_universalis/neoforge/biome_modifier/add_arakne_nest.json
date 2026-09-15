@@ -1,0 +1,6 @@
+{
+  "type": "neoforge:add_features",
+  "biomes": "minecraft:dark_forest",
+  "features": "lingua_universalis:arakne_nest",
+  "step": "vegetal_decoration"
+}

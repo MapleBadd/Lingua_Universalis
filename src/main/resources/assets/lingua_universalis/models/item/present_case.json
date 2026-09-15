@@ -1,0 +1,6 @@
+{
+    "textures":  {
+                     "layer0":  "lingua_universalis:item/present_case"
+                 },
+    "parent":  "minecraft:item/generated"
+}

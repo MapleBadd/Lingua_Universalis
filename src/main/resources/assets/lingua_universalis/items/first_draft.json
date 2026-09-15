@@ -1,0 +1,9 @@
+{
+  "model": {
+    "type": "minecraft:special",
+    "base": "lingua_universalis:item/first_draft",
+    "model": {
+      "type": "geckolib:geckolib"
+    }
+  }
+}

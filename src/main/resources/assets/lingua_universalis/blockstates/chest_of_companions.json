@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "lingua_universalis:block/chest_of_companions"
+    },
+    "facing=south": {
+      "model": "lingua_universalis:block/chest_of_companions",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "lingua_universalis:block/chest_of_companions",
+      "y": 270
+    },
+    "facing=east": {
+      "model": "lingua_universalis:block/chest_of_companions",
+      "y": 90
+    }
+  }
+}

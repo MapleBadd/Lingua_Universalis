@@ -1,0 +1,46 @@
+# Lingua Universalis - NeoForge mod metadata (static; version fields are literal).
+#
+# 许可证 / License：PolyForm Noncommercial License 1.0.0（SPDX: PolyForm-Noncommercial-1.0.0；非 OSI 开源）
+#   - 允许非商业用途（个人/研究/业余，以及慈善/教育/公共机构等）；随附许可证全文或官网链接、保留 Required Notice
+#   - **一切商业用途都需事先获得作者书面授权**；中国网易版渠道仅限作者本人或授权者（见 LICENSE / README）
+# 该字段会在游戏的模组列表里显示，保持一行简短；完整条款见 LICENSE。
+license="PolyForm Noncommercial License 1.0.0"
+
+[[mods]]
+modId="lingua_universalis"
+version="0.1.0"
+displayName="Lingua Universalis"
+description='''
+Lingua Universalis is a monster-girl raising mod themed around companions that
+talk with you, not mere pets.
+
+Species follow a custom taxonomy (regnum/phylum/classis/ordo/familia/sectio)
+driven by data templates: affection, mood, satiety and synergy form the raising
+state machine (wild/friendly/companion/vowed). Interactions, behaviors,
+low-mood behavior and animations are modular and registered per species, so new
+species need data plus assets instead of rewritten core logic.
+
+Targets: Minecraft Java 26.2 + NeoForge. GeckoLib animation integration is
+planned for a later phase.
+'''
+
+[[dependencies.lingua_universalis]]
+    modId="neoforge"
+    type="required"
+    versionRange="[26.2.0.77,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.lingua_universalis]]
+    modId="minecraft"
+    type="required"
+    versionRange="[26.2]"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.lingua_universalis]]
+    modId="geckolib"
+    type="required"
+    versionRange="[5.5.5,)"
+    ordering="NONE"
+    side="BOTH"

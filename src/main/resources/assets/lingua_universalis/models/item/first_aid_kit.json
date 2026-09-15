@@ -1,0 +1,6 @@
+{
+    "textures":  {
+                     "layer0":  "lingua_universalis:item/first_aid_kit"
+                 },
+    "parent":  "minecraft:item/generated"
+}

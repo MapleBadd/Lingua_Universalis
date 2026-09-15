@@ -1,0 +1,161 @@
+{
+	"format_version": "1.8.0",
+	"animations": {
+		"display": {
+			"loop": true,
+			"animation_length": 0.0417,
+			"bones": {
+				"cover": {
+					"rotation": {
+						"vector": [0, 70, 0]
+					}
+				},
+				"backCover": {
+					"rotation": {
+						"vector": [0, -70, 0]
+					}
+				},
+				"all": {
+					"rotation": {
+						"vector": [0, 90, 0]
+					}
+				},
+				"page1": {
+					"rotation": {
+						"vector": [0, 125, 0]
+					}
+				},
+				"page2": {
+					"rotation": {
+						"vector": [0, 15, 0]
+					}
+				}
+			}
+		},
+		"open": {
+			"loop": "hold_on_last_frame",
+			"animation_length": 0.25,
+			"bones": {
+				"cover": {
+					"rotation": {
+						"0.0833": {
+							"vector": [0, 0, 0]
+						},
+						"0.25": {
+							"vector": [0, 70, 0]
+						}
+					}
+				},
+				"backCover": {
+					"rotation": {
+						"0.0833": {
+							"vector": [0, 0, 0]
+						},
+						"0.25": {
+							"vector": [0, -70, 0]
+						}
+					}
+				},
+				"all": {
+					"rotation": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.0833": {
+							"vector": [0, -90, 0]
+						}
+					}
+				},
+				"page1": {
+					"rotation": {
+						"vector": [0, 0, 0]
+					}
+				},
+				"page2": {
+					"rotation": {
+						"vector": [0, 0, 0]
+					}
+				}
+			}
+		},
+		"flip": {
+			"loop": true,
+			"animation_length": 0.5,
+			"bones": {
+				"cover": {
+					"rotation": {
+						"vector": [0, 70, 0]
+					}
+				},
+				"backCover": {
+					"rotation": {
+						"vector": [0, -70, 0]
+					}
+				},
+				"all": {
+					"rotation": {
+						"vector": [0, -90, 0]
+					}
+				},
+				"page1": {
+					"rotation": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.1667": {
+							"vector": [0, 141, 0]
+						},
+						"0.2083": {
+							"vector": [0, -360, 0]
+						}
+					},
+					"scale": {
+						"0.125": {
+							"vector": [1, 1, 1]
+						},
+						"0.1667": {
+							"vector": [0, 1, 1]
+						}
+					}
+				},
+				"page2": {
+					"rotation": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.0833": {
+							"vector": [0, 0, 0]
+						},
+						"0.3333": {
+							"vector": [0, 141, 0]
+						},
+						"0.375": {
+							"vector": [0, -360, 0]
+						}
+					},
+					"scale": {
+						"0.2917": {
+							"vector": [1, 1, 1]
+						},
+						"0.3333": {
+							"vector": [0, 1, 1]
+						}
+					}
+				},
+				"page3": {
+					"rotation": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.25": {
+							"vector": [0, 0, 0]
+						},
+						"0.5": {
+							"vector": [0, 139, 0]
+						}
+					}
+				}
+			}
+		}
+	}
+}

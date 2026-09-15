@@ -1,0 +1,6 @@
+{
+    "textures":  {
+                     "layer0":  "lingua_universalis:item/paper_of_vow"
+                 },
+    "parent":  "minecraft:item/generated"
+}
