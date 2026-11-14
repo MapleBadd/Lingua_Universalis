@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "SSS",
+    " B ",
+    "PPP"
+  ],
+  "key": {
+    "S": "#minecraft:wooden_slabs",
+    "B": "minecraft:chiseled_bookshelf",
+    "P": "#minecraft:planks"
+  },
+  "result": {
+    "id": "lingua_universalis:scriptorium",
+    "count": 1
+  }
+}

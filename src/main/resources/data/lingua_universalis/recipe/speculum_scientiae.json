@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "minecraft:spyglass",
+    "minecraft:amethyst_block",
+    "minecraft:comparator"
+  ],
+  "result": {
+    "id": "lingua_universalis:speculum_scientiae",
+    "count": 1
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:block",
+  "random_sequence": "lingua_universalis:blocks/chest_of_companions",
+  "pools": [
+    {
+      "rolls": 1,
+      "bonus_rolls": 0,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "lingua_universalis:chest_of_companions"
+        }
+      ],
+      "conditions": [
+        {
+          "condition": "minecraft:survives_explosion"
+        }
+      ]
+    }
+  ]
+}

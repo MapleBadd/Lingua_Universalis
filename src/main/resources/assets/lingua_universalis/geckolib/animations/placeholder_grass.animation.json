@@ -1,0 +1,103 @@
+{
+    "format_version":  "1.8.0",
+    "animations":  {
+                       "main_walk":  {
+                                         "loop":  true,
+                                         "animation_length":  1,
+                                         "bones":  {
+
+                                                   }
+                                     },
+                       "tail_swing":  {
+                                          "loop":  true,
+                                          "animation_length":  1,
+                                          "bones":  {
+
+                                                    }
+                                      },
+                       "pet":  {
+                                   "loop":  true,
+                                   "animation_length":  1,
+                                   "bones":  {
+
+                                             }
+                               },
+                       "main_hiss1":  {
+                                          "loop":  true,
+                                          "animation_length":  1,
+                                          "bones":  {
+
+                                                    }
+                                      },
+                       "main_playing1":  {
+                                             "loop":  true,
+                                             "animation_length":  1,
+                                             "bones":  {
+
+                                                       }
+                                         },
+                       "main_sleep":  {
+                                          "loop":  true,
+                                          "animation_length":  1,
+                                          "bones":  {
+
+                                                    }
+                                      },
+                       "random_idle1":  {
+                                            "loop":  true,
+                                            "animation_length":  1,
+                                            "bones":  {
+
+                                                      }
+                                        },
+                       "main_airborne":  {
+                                             "loop":  true,
+                                             "animation_length":  1,
+                                             "bones":  {
+
+                                                       }
+                                         },
+                       "random_blink1":  {
+                                             "loop":  true,
+                                             "animation_length":  1,
+                                             "bones":  {
+
+                                                       }
+                                         },
+                       "main_eat":  {
+                                        "loop":  true,
+                                        "animation_length":  1,
+                                        "bones":  {
+
+                                                  }
+                                    },
+                       "main_idle":  {
+                                         "loop":  true,
+                                         "animation_length":  1,
+                                         "bones":  {
+
+                                                   }
+                                     },
+                       "main_jump":  {
+                                         "loop":  true,
+                                         "animation_length":  1,
+                                         "bones":  {
+
+                                                   }
+                                     },
+                       "main_sit":  {
+                                        "loop":  true,
+                                        "animation_length":  1,
+                                        "bones":  {
+
+                                                  }
+                                    },
+                       "constant":  {
+                                        "loop":  true,
+                                        "animation_length":  1,
+                                        "bones":  {
+
+                                                  }
+                                    }
+                   }
+}

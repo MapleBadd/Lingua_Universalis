@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "lingua_universalis:item/monster_girl_spawn_egg"
+  }
+}

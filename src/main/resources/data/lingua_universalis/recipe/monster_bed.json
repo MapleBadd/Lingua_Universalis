@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "   ",
+    "LWL",
+    "LLL"
+  ],
+  "key": {
+    "L": "#minecraft:logs",
+    "W": "#minecraft:beds"
+  },
+  "result": {
+    "id": "lingua_universalis:monster_bed",
+    "count": 1
+  }
+}

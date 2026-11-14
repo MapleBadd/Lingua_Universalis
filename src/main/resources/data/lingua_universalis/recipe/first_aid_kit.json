@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "SIS",
+    "MAG",
+    "WIW"
+  ],
+  "key": {
+    "S": "minecraft:string",
+    "I": "minecraft:iron_ingot",
+    "M": "minecraft:glistering_melon_slice",
+    "A": "minecraft:golden_apple",
+    "G": "minecraft:golden_carrot",
+    "W": "#minecraft:wool"
+  },
+  "result": {
+    "id": "lingua_universalis:first_aid_kit",
+    "count": 1
+  }
+}

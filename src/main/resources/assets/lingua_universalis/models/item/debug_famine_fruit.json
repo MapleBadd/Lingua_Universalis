@@ -1,0 +1,6 @@
+{
+    "textures":  {
+                     "layer0":  "lingua_universalis:item/debug_famine_fruit"
+                 },
+    "parent":  "minecraft:item/generated"
+}

@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    " S ",
+    " L "
+  ],
+  "key": {
+    "S": "#minecraft:saplings",
+    "L": "#lingua_universalis:stripped_logs"
+  },
+  "result": {
+    "id": "lingua_universalis:whistle",
+    "count": 1
+  }
+}

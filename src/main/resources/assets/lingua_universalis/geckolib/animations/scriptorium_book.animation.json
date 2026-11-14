@@ -1,0 +1,35 @@
+{
+    "format_version":  "1.8.0",
+    "animations":  {
+                       "empty":  {
+                                     "loop":  true,
+                                     "animation_length":  0.0417,
+                                     "bones":  {
+                                                   "book_all":  {
+                                                                    "scale":  {
+                                                                                  "vector":  [
+                                                                                                 0,
+                                                                                                 0,
+                                                                                                 0
+                                                                                             ]
+                                                                              }
+                                                                }
+                                               }
+                                 },
+                       "show":  {
+                                    "loop":  true,
+                                    "animation_length":  0.0417,
+                                    "bones":  {
+                                                  "book_all":  {
+                                                                   "scale":  {
+                                                                                 "vector":  [
+                                                                                                1,
+                                                                                                1,
+                                                                                                1
+                                                                                            ]
+                                                                             }
+                                                               }
+                                              }
+                                }
+                   }
+}

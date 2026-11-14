@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "A A",
+    "CDC",
+    "A A"
+  ],
+  "key": {
+    "A": "minecraft:gold_nugget",
+    "C": "minecraft:leather",
+    "D": "minecraft:writable_book"
+  },
+  "result": {
+    "id": "lingua_universalis:first_draft",
+    "count": 1
+  }
+}

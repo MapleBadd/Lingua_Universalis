@@ -1,0 +1,9 @@
+{
+  "model": {
+    "type": "minecraft:special",
+    "base": "lingua_universalis:item/monster_bed",
+    "model": {
+      "type": "geckolib:geckolib"
+    }
+  }
+}

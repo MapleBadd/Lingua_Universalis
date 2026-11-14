@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "package": "com.linguauniversalis.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "minVersion": "0.8",
+  "mixins": [
+    "CreeperCatAvoidMixin",
+    "PhantomCatFearMixin"
+  ],
+  "client": [],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "ILI",
+    " C ",
+    "ILI"
+  ],
+  "key": {
+    "I": "minecraft:iron_ingot",
+    "L": "#minecraft:logs",
+    "C": "minecraft:chest"
+  },
+  "result": {
+    "id": "lingua_universalis:chest_of_companions",
+    "count": 1
+  }
+}

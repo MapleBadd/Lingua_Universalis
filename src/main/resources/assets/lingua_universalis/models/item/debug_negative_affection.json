@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "lingua_universalis:item/debug_negative_affection"
+  }
+}
