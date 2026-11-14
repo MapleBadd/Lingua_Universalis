@@ -4,8 +4,7 @@ import com.linguauniversalis.client.CompanionChestRenderer;
 import com.linguauniversalis.client.CompanionChestScreen;
 import com.linguauniversalis.client.GirlInventoryScreen;
 import com.linguauniversalis.client.LuBoltRenderer;
-import com.linguauniversalis.client.MonsterGirlRenderer;
-import com.linguauniversalis.client.NekomataRenderer;
+import com.linguauniversalis.client.SpeciesRenderer;
 import com.linguauniversalis.registry.LUEntities;
 import com.linguauniversalis.registry.LURegistries;
 import net.neoforged.api.distmarker.Dist;
@@ -24,22 +23,46 @@ public final class LinguaUniversalisClient {
     public LinguaUniversalisClient(IEventBus modEventBus) {
         modEventBus.addListener(this::onRegisterRenderers);
         modEventBus.addListener(this::onRegisterMenuScreens);
+        modEventBus.addListener(this::onAddClientReloadListeners);
+    }
+
+    /** 客户端资源重载：清掉渲染回退的"资源是否存在"缓存。 */
+    private void onAddClientReloadListeners(
+            net.neoforged.neoforge.client.event.AddClientReloadListenersEvent event) {
+        event.addListener(net.minecraft.resources.Identifier.parse("lingua_universalis:render_cache"),
+                (net.minecraft.server.packs.resources.ResourceManagerReloadListener) resources ->
+                        com.linguauniversalis.client.SpeciesGeoModel.clearResourceCache());
     }
 
     private void onRegisterMenuScreens(RegisterMenuScreensEvent event) {
         event.register(LURegistries.GIRL_INVENTORY_MENU.get(), GirlInventoryScreen::new);
         event.register(LURegistries.COMPANION_CHEST_MENU.get(), CompanionChestScreen::new);
+        // 图鉴界面（P1 骨架）
+        event.register(LURegistries.CODEX_MENU.get(),
+                com.linguauniversalis.client.CodexScreen::new);
     }
 
     private void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
         // 通用/阿拉克涅：占位人形渲染器（复用原版玩家模型 + 村民贴图；待各自美术资源就绪后替换）
-        event.registerEntityRenderer(LUEntities.MONSTER_GIRL.get(), MonsterGirlRenderer::new);
-        event.registerEntityRenderer(LUEntities.ARAKNE.get(), MonsterGirlRenderer::new);
-        // 猫又：GeckoLib 模型 + 动画（geo/animations/textures 资源）
-        event.registerEntityRenderer(LUEntities.NEKOMATA.get(), NekomataRenderer::new);
+        // 占位：草方块（原版人形占位太丑，已替换）
+        event.registerEntityRenderer(LUEntities.MONSTER_GIRL.get(),
+                com.linguauniversalis.client.PlaceholderGrassRenderer::new);
+        event.registerEntityRenderer(LUEntities.ARAKNE.get(),
+                com.linguauniversalis.client.PlaceholderGrassRenderer::new);
+        // 有 GeckoLib 资源的物种：通用物种渲染器（资源按物种 id 推导，新物种无需写渲染类）
+        event.registerEntityRenderer(LUEntities.NEKOMATA.get(),
+                context -> new SpeciesRenderer(context, "nekomata"));
         // 能力弹道（蛛网/蛛丝拉拽/暗影箭）：占位复用原版箭贴图
         event.registerEntityRenderer(LUEntities.LU_BOLT.get(), LuBoltRenderer::new);
         // 伙伴宝箱：复用原版箱子渲染器，材质强制末影箱（占位外观）
         event.registerBlockEntityRenderer(LURegistries.COMPANION_CHEST_BE.get(), CompanionChestRenderer::new);
+        // 绽放之刺：GeckoLib 模型（美术的 geo），方块本体用空模型
+        event.registerBlockEntityRenderer(LURegistries.SPINA_FLORENS_BE.get(),
+                com.linguauniversalis.client.SpinaFlorensRenderer::new);
+        // 誊写台：GeckoLib 模型 + 台面上的初稿（BookLocator 定位）
+        event.registerBlockEntityRenderer(LURegistries.MONSTER_BED_BE.get(),
+                com.linguauniversalis.client.MonsterBedRenderer::new);
+        event.registerBlockEntityRenderer(LURegistries.SCRIPTORIUM_BE.get(),
+                com.linguauniversalis.client.ScriptoriumRenderer::new);
     }
 }

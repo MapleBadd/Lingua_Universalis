@@ -64,6 +64,31 @@ public final class HeadLookRules {
         return sign < 0 ? -degrees : degrees;
     }
 
+    /**
+     * "低头"分量的衰减系数（0 = 完全不低头，1 = 完全跟随原版）。
+     *
+     * <p>为什么需要：原版 {@code LookControl} 算俯仰是"从**她的眼**看向**目标的眼睛**"。
+     * 猫又的视线高度是 {@code 2.1548}（模型 ViewLocator 枢轴），而玩家眼睛只有约 {@code 1.62}，
+     * 于是她看同高度的玩家时必须低头 15°~25°（1~3 格距离）——模型渲染出的头还比 2.15 更高，
+     * 画面上就成了"低头盯着玩家的脚"。这里把这个**向下**分量按系数压扁，
+     * 抬头（负值）不动，所以你要蹲下/站高处时她仍会抬头看你。
+     */
+    public static final double DOWN_PITCH_SCALE = 0.3;
+
+    /**
+     * 衰减俯仰里的低头分量（MC 口径：<b>正值 = 低头</b>）。
+     *
+     * @param pitchDeg 原始俯仰（度）
+     * @param scale    低头衰减系数（0 = 不低头，1 = 原样）
+     */
+    public static double softenDownPitch(double pitchDeg, double scale) {
+        if (pitchDeg <= 0.0) {
+            return pitchDeg;
+        }
+        double clampedScale = Math.max(0.0, Math.min(1.0, scale));
+        return pitchDeg * clampedScale;
+    }
+
     /** 度 → 弧度（骨骼旋转用）。 */
     public static float toRadians(double degrees) {
         return (float) Math.toRadians(degrees);

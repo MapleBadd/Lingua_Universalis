@@ -61,7 +61,9 @@ public class NekomataRenderer extends GeoEntityRenderer<MonsterGirlEntity, Livin
 
     public NekomataRenderer(EntityRendererProvider.Context context) {
         super(context, new NekomataGeoModel());
-        this.catFormRenderer = new CatFormRenderer(context);
+        this.catFormRenderer = new CatFormRenderer(context,
+                net.minecraft.resources.Identifier.parse(
+                        "minecraft:textures/entity/cat/cat_all_black.png"));
         // 模型渲染缩放（config/lingua_universalis.properties 的 model.renderScale；1.0 = 原尺寸）
         this.withScale((float) com.linguauniversalis.core.config.LuSettings.get().modelRenderScale("nekomata"));
     }

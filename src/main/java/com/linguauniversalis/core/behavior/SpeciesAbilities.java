@@ -48,8 +48,16 @@ public final class SpeciesAbilities {
         return Math.max(0L, (long) p.templateParam(TemplateKeys.ABILITY_SILK_COOLDOWN_TICKS, 0));
     }
 
-    /** 蛛丝拉拽伤害（默认 10）。 */
+    /**
+     * 蛛丝拉拽伤害。
+     *
+     * <p><b>没有蛛丝能力的物种必须返回 0</b>：以前这里把缺省值写成 10，
+     * 结果连猫又（根本没有丝）也会被图鉴当成会"丝线"——用冷却当总开关即可。
+     */
     public static float silkDamage(SpeciesProfile p) {
+        if (silkCooldownTicks(p) <= 0L) {
+            return 0.0F;
+        }
         return (float) Math.max(0.0, p.templateParam(TemplateKeys.ABILITY_SILK_DAMAGE, 10.0));
     }
 
@@ -211,7 +219,7 @@ public final class SpeciesAbilities {
         }
     }
 
-    // ------------------------------------------------------------------ 流血（猫又绒科）
+    // ------------------------------------------------------------------ 流血（猫又绒）
     /**
      * 流血状态（针对单个受害者）：命中刷新时长并<b>层级 +1（无上限）</b>；
      * 每 {@code tickIntervalTicks} 结算一次，伤害 = 层级（物理伤害，由实体层施加）。

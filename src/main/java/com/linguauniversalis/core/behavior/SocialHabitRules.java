@@ -60,7 +60,7 @@ public final class SocialHabitRules {
         return profile.templateFlag(TemplateKeys.FLAG_SPECIES_STEALS_EMERALDS, false);
     }
 
-    /** 亡灵视野是否给心情（幽暗目默认 true）。 */
+    /** 亡灵视野是否给心情（幽暗默认 true）。 */
     public static boolean undeadSightMood(SpeciesProfile profile) {
         return profile.featureFlag(TemplateKeys.FLAG_FAMILIA_UNDEAD_SIGHT_MOOD, false);
     }

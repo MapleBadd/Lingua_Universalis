@@ -591,6 +591,11 @@
 					]
 				},
 				{
+					"name": "EyesLocator",
+					"parent": "Eyes",
+					"pivot": [0, 35.47642, -0.81915]
+				},
+				{
 					"name": "ears",
 					"parent": "Head",
 					"pivot": [0, 42.47642, -0.81915]
@@ -1458,6 +1463,11 @@
 					]
 				},
 				{
+					"name": "RightPawLocator2",
+					"parent": "LeftPaw",
+					"pivot": [3.65471, 17.82045, -0.01]
+				},
+				{
 					"name": "LeftShoulder",
 					"parent": "LeftArm",
 					"pivot": [5.34471, 30.07045, 1.49],
@@ -1688,6 +1698,11 @@
 							}
 						}
 					]
+				},
+				{
+					"name": "RightPawLocator",
+					"parent": "RightPaw",
+					"pivot": [-3.65471, 17.82045, -0.01]
 				},
 				{
 					"name": "RightShoulder",

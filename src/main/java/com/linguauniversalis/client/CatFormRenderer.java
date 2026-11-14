@@ -35,15 +35,16 @@ import java.util.WeakHashMap;
  */
 public class CatFormRenderer extends LivingEntityRenderer<MonsterGirlEntity, CatRenderState,
         AbstractFelineModel<CatRenderState>> {
-    private static final Identifier CAT_TEXTURE =
-            Identifier.parse(CatFormRules.CAT_FORM_TEXTURE);
+    /** 贴图由形态定义给出（不同物种/不同形态可以各不相同）；未指定时用文档里的默认猫贴图。 */
+    private final Identifier texture;
 
     /** 每只个体一份姿态进度（仅客户端；弱引用避免实体卸载后泄漏）。 */
     private final Map<MonsterGirlEntity, CatPose> poses = new WeakHashMap<>();
 
-    public CatFormRenderer(EntityRendererProvider.Context context) {
+    public CatFormRenderer(EntityRendererProvider.Context context, Identifier texture) {
         super(context, new AdultCatModel(context.bakeLayer(ModelLayers.CAT)),
                 CatFormRules.CAT_FORM_SHADOW_RADIUS);
+        this.texture = texture == null ? Identifier.parse(CatFormRules.CAT_FORM_TEXTURE) : texture;
     }
 
     @Override
@@ -53,7 +54,7 @@ public class CatFormRenderer extends LivingEntityRenderer<MonsterGirlEntity, Cat
 
     @Override
     public Identifier getTextureLocation(CatRenderState state) {
-        return CAT_TEXTURE;
+        return texture;
     }
 
     @Override
@@ -73,7 +74,7 @@ public class CatFormRenderer extends LivingEntityRenderer<MonsterGirlEntity, Cat
             pose.step(lying);
         }
 
-        state.texture = CAT_TEXTURE;
+        state.texture = texture;
         state.isCrouching = girl.isCrouching();
         state.isSprinting = girl.isSprinting();
         state.isSitting = sitting;

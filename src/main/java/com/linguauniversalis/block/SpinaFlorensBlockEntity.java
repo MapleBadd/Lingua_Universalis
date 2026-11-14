@@ -15,8 +15,14 @@ import java.util.List;
 
 /**
  * 绽放之刺方块实体：承载被吸收命缕的个体快照；周期性对重叠生物造成接触伤害。
+ *
+ * <p>同时是 GeckoLib 的 {@link com.geckolib.animatable.GeoBlockEntity}：
+ * 外观由美术资源里的 {@code spina_florens.geo.json} 渲染（客户端 {@code SpinaFlorensRenderer}）。
+ * 目前没有控制器（静态摆件），以后要做"绽放/合拢"动画时，在这里注册控制器并补一条动画资源即可。
  */
-public class SpinaFlorensBlockEntity extends BlockEntity {
+public class SpinaFlorensBlockEntity extends BlockEntity implements com.geckolib.animatable.GeoBlockEntity {
+    private final com.geckolib.animatable.instance.AnimatableInstanceCache geoCache =
+            com.geckolib.util.GeckoLibUtil.createInstanceCache(this);
     private static final String TAG_SNAPSHOT = "Snapshot";
     private static final long DAMAGE_INTERVAL_TICKS = 10L;
 
@@ -24,6 +30,16 @@ public class SpinaFlorensBlockEntity extends BlockEntity {
 
     public SpinaFlorensBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
+    }
+
+    /** 暂无动画控制器（静态模型）；以后要播动画在这里 add。 */
+    @Override
+    public void registerControllers(com.geckolib.animatable.manager.AnimatableManager.ControllerRegistrar controllers) {
+    }
+
+    @Override
+    public com.geckolib.animatable.instance.AnimatableInstanceCache getAnimatableInstanceCache() {
+        return geoCache;
     }
 
     public boolean hasSnapshot() {

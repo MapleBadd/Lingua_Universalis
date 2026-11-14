@@ -71,6 +71,11 @@ repositories {
         name = 'Modrinth'
         url = 'https://api.modrinth.com/maven'
     }
+    // JEI（配方查看）：API 走 compileOnly，完整 jar 只在开发运行期需要。
+    maven {
+        name = 'BlameJared'
+        url = 'https://maven.blamejared.com'
+    }
 }
 
 dependencies {
@@ -79,6 +84,11 @@ dependencies {
     // 用版本号解析可能拿到 Fabric 那个（编译能过，但 NeoForge 运行期不是 mod → 依赖缺失）。
     // 版本 id 与版本号见 gradle.properties（geckolib_version_id / geckolib_version）。
     implementation "maven.modrinth:geckolib:${geckolib_version_id}"
+
+    // JEI（可选前置，玩家自行安装）：这里只要 API 供编译。
+    // 不声明 runtimeOnly —— 开发运行期若需要，把完整 jar 放进 run/mods 即可（避免强制解析其全部传递依赖）。
+    compileOnly("mezz.jei:jei-26.2-neoforge-api:${jei_version}") { transitive = false }
+    compileOnly("mezz.jei:jei-26.2-common-api:${jei_version}") { transitive = false }
 }
 
 tasks.withType(JavaCompile).configureEach {

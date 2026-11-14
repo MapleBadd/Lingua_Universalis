@@ -119,8 +119,6 @@ public class MonsterGirlEntity extends PathfinderMob
             com.linguauniversalis.core.behavior.MovementSpeedRules.FOLLOW_STOP_DIST_SQ;
     /** 与主人 >32 格：就近传送（原 64 格，太远，收近）。 */
     private static final double FOLLOW_TELEPORT_DIST_SQ = 1024.0;
-    /** 与主人 ≤12 格：每 tick 持续看向主人（保证头部平滑跟随，不“看一眼就回正”）。 */
-    private static final double FOLLOW_LOOK_DIST_SQ = 144.0;
 
     // ---------------------------------------------------------------- 敌意/近战（Phase 4 物种专属行为）
     /** 当前敌意目标（服务端；由敌意规则每 N tick 重算）。 */
@@ -151,10 +149,7 @@ public class MonsterGirlEntity extends PathfinderMob
     private long dodgeInvulnUntilTick = -1L;
 
     // ---------------------------------------------------------------- 伪装形态（设计 §12 猫又）
-    /** 同步标记：true = 伪装形态（猫形，客户端据此换模型/贴图）。 */
-    private static final net.minecraft.network.syncher.EntityDataAccessor<Boolean> DATA_CAT_FORM =
-            net.minecraft.network.syncher.SynchedEntityData.defineId(
-                    MonsterGirlEntity.class, net.minecraft.network.syncher.EntityDataSerializers.BOOLEAN);
+
     /** 最近一次现出人形的 tick（-1 = 从未）。 */
     private long lastRevealTick = -1L;
 
@@ -177,10 +172,67 @@ public class MonsterGirlEntity extends PathfinderMob
     private static final net.minecraft.network.syncher.EntityDataAccessor<Boolean> DATA_ANIM_EAT =
             net.minecraft.network.syncher.SynchedEntityData.defineId(
                     MonsterGirlEntity.class, net.minecraft.network.syncher.EntityDataSerializers.BOOLEAN);
+    /** 同步：当前变形形态 id（空串 = 本体形态；见 {@code core/species/DisguiseRegistry}）。 */
+    private static final net.minecraft.network.syncher.EntityDataAccessor<String> DATA_DISGUISE_FORM =
+            net.minecraft.network.syncher.SynchedEntityData.defineId(
+                    MonsterGirlEntity.class, net.minecraft.network.syncher.EntityDataSerializers.STRING);
+    /** 同步：战斗模式 id（被动/主动；头顶状态牌与哨子切换用）。 */
+    private static final net.minecraft.network.syncher.EntityDataAccessor<String> DATA_COMBAT_MODE =
+            net.minecraft.network.syncher.SynchedEntityData.defineId(
+                    MonsterGirlEntity.class, net.minecraft.network.syncher.EntityDataSerializers.STRING);
+    /** 同步：是否倒地（战败）。 */
+    private static final net.minecraft.network.syncher.EntityDataAccessor<Boolean> DATA_DOWNED =
+            net.minecraft.network.syncher.SynchedEntityData.defineId(
+                    MonsterGirlEntity.class, net.minecraft.network.syncher.EntityDataSerializers.BOOLEAN);
+    /**
+     * 同步：是否应播"悬空"动画（<b>服务端权威</b>）。
+     *
+     * <p>为什么必须同步而不是客户端自己算：非玩家实体的 {@code onGround} 客户端只在收到移动包时才更新，
+     * 刚进游戏/静止不动的个体会一直是 false ⇒ 客户端"以为她在空中"，
+     * 于是刚进游戏前几秒播悬浮空动画（这就是那个 bug）。
+     */
+    private static final net.minecraft.network.syncher.EntityDataAccessor<Boolean> DATA_AIRBORNE =
+            net.minecraft.network.syncher.SynchedEntityData.defineId(
+                    MonsterGirlEntity.class, net.minecraft.network.syncher.EntityDataSerializers.BOOLEAN);
+    /** 同步：是否正在睡觉（床或巢穴处）；动画据此播 main_sleep。 */
+    private static final net.minecraft.network.syncher.EntityDataAccessor<Boolean> DATA_SLEEPING =
+            net.minecraft.network.syncher.SynchedEntityData.defineId(
+                    MonsterGirlEntity.class, net.minecraft.network.syncher.EntityDataSerializers.BOOLEAN);
+    /** 同步：是否伙伴档（只有伙伴才显示头顶状态牌）。 */
+    private static final net.minecraft.network.syncher.EntityDataAccessor<Boolean> DATA_COMPANION =
+            net.minecraft.network.syncher.SynchedEntityData.defineId(
+                    MonsterGirlEntity.class, net.minecraft.network.syncher.EntityDataSerializers.BOOLEAN);
+    /** 同步：绑定的玩家 UUID（空串 = 未绑定）。状态牌"只有主人看得到"靠它判定。 */
+    private static final net.minecraft.network.syncher.EntityDataAccessor<String> DATA_OWNER_UUID =
+            net.minecraft.network.syncher.SynchedEntityData.defineId(
+                    MonsterGirlEntity.class, net.minecraft.network.syncher.EntityDataSerializers.STRING);
+    /** 同步：倒地锁血剩余秒数（0 = 锁血结束 = 濒死）。 */
+    private static final net.minecraft.network.syncher.EntityDataAccessor<Integer> DATA_DOWNED_SECONDS =
+            net.minecraft.network.syncher.SynchedEntityData.defineId(
+                    MonsterGirlEntity.class, net.minecraft.network.syncher.EntityDataSerializers.INT);
+    /** 同步：注视目标实体 id（-1 = 无）——渲染端据此让头部跟随目标。 */
+    private static final net.minecraft.network.syncher.EntityDataAccessor<Integer> DATA_LOOK_TARGET =
+            net.minecraft.network.syncher.SynchedEntityData.defineId(
+                    MonsterGirlEntity.class, net.minecraft.network.syncher.EntityDataSerializers.INT);
+
     /** 同步：当前命令模式 id（猫形坐姿等表现用）。 */
     private static final net.minecraft.network.syncher.EntityDataAccessor<String> DATA_OBEY_MODE =
             net.minecraft.network.syncher.SynchedEntityData.defineId(
                     MonsterGirlEntity.class, net.minecraft.network.syncher.EntityDataSerializers.STRING);
+    /**
+     * 同步：主手<b>可视物品</b>（客户端渲染在 {@code RightPaw} 下的定位组上）。
+     *
+     * <p>她的主手/副手是背包里的命名槽位（{@code main_hand} / {@code off_hand}，
+     * 见 {@code core/behavior/InventoryRules}），不属于原版装备槽位体系，客户端无从得知；
+     * 因此由服务端每 tick 把这两格同步成"渲染输入"（值不变时数据监视器不发包）。
+     */
+    private static final net.minecraft.network.syncher.EntityDataAccessor<ItemStack> DATA_MAIN_HAND_ITEM =
+            net.minecraft.network.syncher.SynchedEntityData.defineId(
+                    MonsterGirlEntity.class, net.minecraft.network.syncher.EntityDataSerializers.ITEM_STACK);
+    /** 同步：副手可视物品（客户端渲染在 {@code LeftPaw} 下的定位组上）。 */
+    private static final net.minecraft.network.syncher.EntityDataAccessor<ItemStack> DATA_OFF_HAND_ITEM =
+            net.minecraft.network.syncher.SynchedEntityData.defineId(
+                    MonsterGirlEntity.class, net.minecraft.network.syncher.EntityDataSerializers.ITEM_STACK);
 
     // ---------------------------------------------------------------- 社交习性（设计 §12 猫又）
     /** 上次偷鱼 tick（-1 = 从未）。 */
@@ -208,16 +260,16 @@ public class MonsterGirlEntity extends PathfinderMob
      */
     private boolean everAffectioned;
 
-    // ---------------------------------------------------------------- 巢心（领地巡游纲）
+    // ---------------------------------------------------------------- 巢心（领地巡游）
     /** 领地/威胁圆心的巢心方块坐标（null = 尚无巢）。 */
     private BlockPos nestPos;
-    /** 是否"无巢狂暴"（领地巡游纲模板默认 true；刷怪蛋生成个体 = false，见 finalizeSpawn）。 */
+    /** 是否"无巢狂暴"（领地巡游模板默认 true；刷怪蛋生成个体 = false，见 finalizeSpawn）。 */
     private boolean rageWithoutNest = true;
     /** 当前狂暴状态（每 tick 由 NestGuard 依据巢心评估）。 */
     private boolean enraged;
     /** 巢心认领扫描节流（无巢时周期性找附近巢心方块）。 */
     private int nestClaimTicks;
-    /** 外生息门·巢穴增益下次刷新 tick。 */
+    /** 外生息·巢穴增益下次刷新 tick。 */
     private long nestBuffNextTick;
     /** 巢穴增益刷新间隔（tick，4 秒）与持续时长（tick，6 秒，略长于刷新间隔避免闪烁）。 */
     private static final long NEST_BUFF_REFRESH_TICKS = 80L;
@@ -225,24 +277,12 @@ public class MonsterGirlEntity extends PathfinderMob
 
     /** 连续离地 tick 数（客户端也维护；用于 airborne 动画的"稳定"判定）。 */
     private int airborneTicks;
+    /** 服务端算好的"是否播悬空动画"（每 tick 更新后同步给客户端）。 */
+    private boolean airborneVisual;
 
     /** 主控制器引用（构造后赋值；供其判定回调里动态改 {@code main_walk} 播放倍速）。 */
     private com.geckolib.animation.AnimationController<MonsterGirlEntity> mainController;
 
-
-    /** 当前注视目标（服务端维护，同步给客户端用于头部跟随的偏航/俯仰来源）。 */
-    private int syncLookTargetId = -1;
-
-    // ---------------------------------------------------------------- 客户端表现用同步状态（注视目标）
-    /** 同步：当前注视的实体 id（-1 = 无）。 */
-    private static final net.minecraft.network.syncher.EntityDataAccessor<Integer> DATA_LOOK_TARGET_ID =
-            net.minecraft.network.syncher.SynchedEntityData.defineId(
-                    MonsterGirlEntity.class, net.minecraft.network.syncher.EntityDataSerializers.INT);
-
-    /** 客户端表现：当前注视目标实体 id（-1 = 无）。 */
-    public int lookTargetIdVisual() {
-        return this.getEntityData().get(DATA_LOOK_TARGET_ID);
-    }
 
     public MonsterGirlEntity(EntityType<? extends PathfinderMob> type, Level level) {
         super(type, level);
@@ -334,15 +374,15 @@ public class MonsterGirlEntity extends PathfinderMob
                         .mainTransitionTicks(this.speciesId), test -> {
             MonsterGirlEntity girl = test.animatable();
             boolean jumpAnim = girl.isJumpAnimActive();
-            boolean airborne = com.linguauniversalis.core.anim.AnimationRules.shouldShowAirborne(
-                    com.linguauniversalis.core.anim.AnimationRules.isAirborne(
-                            girl.onGround(), girl.isInWater() || girl.isInLava(), girl.isFallFlying()),
-                    girl.fallDistance, girl.airborneTicks);
+            // 悬空判定用服务端同步值：客户端自己的 onGround 在"刚进游戏 / 静止不动"时是脏的
+            boolean airborne = girl.isAirborneVisual();
             boolean eating = girl.isEatAnimActive();
-            boolean sitting = girl.isDormantVisual();
+            // 睡觉：休眠 / 战败倒地 / 睡在床上 —— 一律先播 main_sleep 顶着
+            boolean sleeping = girl.isDormantVisual() || girl.isDownedVisual() || girl.isSleepingVisual();
+            boolean sitting = !sleeping && girl.isStandingByVisual();
             boolean moving = test.isMoving();
             String name = com.linguauniversalis.core.anim.AnimationRules.mainAnimation(
-                    jumpAnim, airborne, eating, sitting, moving);
+                    jumpAnim, airborne, eating, sleeping, sitting, moving);
             // 过渡时长按目标动画选：切到 main_jump 用短过渡（默认 0 = 硬切），否则用主过渡时长。
             // 跳跃动画只有 0.42 秒，长过渡会把整段跳跃稀释掉（表现为"跳跃动画没生效"）。
             if (mainRef.controller != null) {
@@ -362,7 +402,14 @@ public class MonsterGirlEntity extends PathfinderMob
         registrar.add(this.mainController);
 
         // 尾巴混合动画（持续播放；未来按心情/状态切换不同 tail_ 动画）
-        registrar.add(loopController("tail", com.linguauniversalis.core.anim.AnimationRules.BLEND_TAIL_SWING));
+        // 优先级：睡眠 > 尾巴 > 其他主要动画。
+        // 睡着（含休眠/战败）时这一层改播 main_sleep —— 与主层同一套静态睡姿，
+        // 于是尾巴被"写成睡姿并保持不动"，而不是继续摆（返回 STOP 停不住已在播的 loop）。
+        registrar.add(toggledLoopController("tail",
+                com.linguauniversalis.core.anim.AnimationRules.BLEND_TAIL_SWING,
+                com.linguauniversalis.core.anim.AnimationRules.MAIN_SLEEP,
+                girl -> com.linguauniversalis.core.anim.AnimationRules.shouldPlayTailSwing(
+                        girl.isSleepingVisual() || girl.isDormantVisual() || girl.isDownedVisual())));
 
         // 随机混合动画：两系列各自独立计时（每秒 3%，同系列互斥）
         registrar.add(randomController("random_blink", blinkSeries));
@@ -416,7 +463,31 @@ public class MonsterGirlEntity extends PathfinderMob
         return controller;
     }
 
-    /** 随机混合动画控制器：命中时播一遍，否则不干扰当前姿态。 */
+    /**
+ * 两段常驻混合动画控制器：条件成立播 A，否则播 B。
+ *
+ * <p>为什么不用 {@code PlayState.STOP} 表示"这层不参与"：GeckoLib 里对已经在播的 loop 返回 STOP
+ * 并不能可靠地把它停掉（实测睡眠时尾巴仍在摆）。改成"条件不成立时改播另一段动画"，
+ * 由动画本身把骨骼写成想要的数值 —— 结果是确定的。
+ */
+private static com.geckolib.animation.AnimationController<MonsterGirlEntity> toggledLoopController(
+        String controllerName, String animationWhenOn, String animationWhenOff,
+        java.util.function.Predicate<MonsterGirlEntity> on) {
+    ControllerRef ref = new ControllerRef();
+    com.geckolib.animation.AnimationController<MonsterGirlEntity> controller =
+            new com.geckolib.animation.AnimationController<MonsterGirlEntity>(
+                    controllerName, test -> {
+                        MonsterGirlEntity girl = test.animatable();
+                        String name = on.test(girl) ? animationWhenOn : animationWhenOff;
+                        ref.applySpeed(girl, name);
+                        return test.setAndContinue(
+                                com.geckolib.animation.RawAnimation.begin().thenLoop(name));
+                    });
+    ref.controller = controller;
+    return controller;
+}
+
+/** 随机混合动画控制器：命中时播一遍，否则不干扰当前姿态。 */
     private static com.geckolib.animation.AnimationController<MonsterGirlEntity> randomController(
             String controllerName, com.linguauniversalis.core.anim.AnimationRules.RandomSeries series) {
         ControllerRef ref = new ControllerRef();
@@ -457,16 +528,30 @@ public class MonsterGirlEntity extends PathfinderMob
     @Override
     protected void defineSynchedData(net.minecraft.network.syncher.SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
-        builder.define(DATA_CAT_FORM, false);
         builder.define(DATA_DORMANT, false);
         builder.define(DATA_SLEEPING_WITH_OWNER, false);
         builder.define(DATA_ANIM_JUMP, false);
         builder.define(DATA_ANIM_EAT, false);
         builder.define(DATA_OBEY_MODE, CommandMode.FOLLOW.englishId);
-        builder.define(DATA_LOOK_TARGET_ID, -1);
+        builder.define(DATA_LOOK_TARGET, -1);
+        builder.define(DATA_DISGUISE_FORM, "");
+        builder.define(DATA_COMBAT_MODE, com.linguauniversalis.core.behavior.CombatModeRules.DEFAULT_MODE.id());
+        builder.define(DATA_AIRBORNE, false);
+        builder.define(DATA_SLEEPING, false);
+        builder.define(DATA_COMPANION, false);
+        builder.define(DATA_OWNER_UUID, "");
+        builder.define(DATA_DOWNED, false);
+        builder.define(DATA_DOWNED_SECONDS, 0);
+        builder.define(DATA_MAIN_HAND_ITEM, ItemStack.EMPTY);
+        builder.define(DATA_OFF_HAND_ITEM, ItemStack.EMPTY);
     }
 
     // ---------------------------------------------------------------- 客户端表现读取
+    /** 客户端表现：注视目标实体 id（-1 = 没有目标）。 */
+    public int lookTargetIdVisual() {
+        return this.getEntityData().get(DATA_LOOK_TARGET);
+    }
+
     /** 客户端表现：是否休眠。 */
     public boolean isDormantVisual() {
         return this.getEntityData().get(DATA_DORMANT);
@@ -492,6 +577,237 @@ public class MonsterGirlEntity extends PathfinderMob
         return this.getEntityData().get(DATA_ANIM_EAT);
     }
 
+    /** 客户端表现：主手可视物品（定位组渲染输入，只读）。 */
+    public ItemStack mainHandVisual() {
+        return this.getEntityData().get(DATA_MAIN_HAND_ITEM);
+    }
+
+    /** 客户端表现：副手可视物品（定位组渲染输入，只读）。 */
+    public ItemStack offHandVisual() {
+        return this.getEntityData().get(DATA_OFF_HAND_ITEM);
+    }
+
+    /**
+     * 读取手上命名槽位的物品并<b>复制</b>一份用于同步。
+     *
+     * <p>为什么要复制：{@code ItemStack} 在 26.2 <b>没有覆写 equals</b>，数据监视器用的
+     * {@code ObjectUtils.notEqual} 实际是<b>引用比较</b>。若把背包里那个实例直接塞进去，
+     * 之后进食扣数量之类原地修改不会让"引用"变化，客户端永远收不到更新；
+     * 复制一份则每次都是新实例，再由 {@link #setHandVisual} 按内容比较决定要不要真的写。
+     */
+    private ItemStack handVisualCopy(InteractionHand hand) {
+        SpeciesProfile profile = profile();
+        int index = hand == InteractionHand.MAIN_HAND
+                ? com.linguauniversalis.core.behavior.InventoryRules.mainHandIndex(profile)
+                : com.linguauniversalis.core.behavior.InventoryRules.offHandIndex(profile);
+        GirlInventory inventory = girlInventory();
+        if (index < 0 || index >= inventory.getContainerSize()) {
+            return ItemStack.EMPTY;
+        }
+        ItemStack stack = inventory.getItem(index);
+        return stack.isEmpty() ? ItemStack.EMPTY : stack.copy();
+    }
+
+    /**
+     * 写入手上物品的同步值：<b>先按内容比较</b>，真的变了才写。
+     *
+     * <p>{@code ItemStack} 没有覆写 equals，直接每 tick {@code data.set(新副本)} 会被数据监视器
+     * 判定为"每 tick 都变了"（引用不同）→ 每 tick 发包。这里用 {@link ItemStack#matches} 比较
+     * 物品/数量/组件，没变就跳过。
+     */
+    private void setHandVisual(net.minecraft.network.syncher.EntityDataAccessor<ItemStack> key, ItemStack current) {
+        net.minecraft.network.syncher.SynchedEntityData data = this.getEntityData();
+        if (ItemStack.matches(data.get(key), current)) {
+            return;
+        }
+        data.set(key, current);
+    }
+
+    // ------------------------------------------------------------------ 睡眠（床 / 巢穴）
+    /**
+     * 睡眠 tick：决定"这个时段她该不该睡、睡哪儿"，并把她带过去/让她躺下。
+     *
+     * <p>口径（规则层 {@link com.linguauniversalis.core.behavior.SleepRules}）：
+     * <ul>
+     *   <li>夜行性物种<b>白天睡</b>，非夜行性夜里睡；</li>
+     *   <li>正在跟随玩家 / 倒地 / 低落 / 休眠 时不进入睡眠流程；</li>
+     *   <li>有巢穴 ↔ 巢心 3 格内就地睡；无巢穴的伙伴 ↔ 走到<b>尺寸匹配</b>的魔物床睡；
+     *       无巢穴的野生/友善 ↔ 不睡（没有能睡的地方）。</li>
+     * </ul>
+     */
+    private void tickSleep(ServerLevel server) {
+        // 被命令跟随玩家时不睡（跟主人走是优先事项）
+        boolean following = CommandMode.FOLLOW.englishId.equals(obeyModeId)
+                && girlState.boundPlayerUuid() != null
+                && CommandRules.canCommand(girlState, girlState.boundPlayerUuid());
+        boolean sleepTime = com.linguauniversalis.core.behavior.SleepRules.isSleepTime(
+                server.getOverworldClockTime(),
+                com.linguauniversalis.core.behavior.SleepRules.nocturnal(profile()));
+        // 玩家命令优先：待机（站定）与跟随都不该自己走去睡觉（散步/睡眠/跑腿都让位于命令）
+        boolean commandedStill = CommandRules.blocksAutonomousMovement(obeyModeId);
+        boolean blocked = girlState.downed() || girlState.dormant() || girlState.isDepressed() || following
+                || commandedStill || hasCombatTarget() || isOnChestErrand();
+
+        if (blocked || !sleepTime) {
+            if (sleeping) {
+                wakeUp();
+            }
+            return;
+        }
+
+        com.linguauniversalis.core.behavior.SleepRules.Intent intent =
+                com.linguauniversalis.core.behavior.SleepRules.intent(
+                        true, profile().hasNest(), girlState.isCompanion());
+        switch (intent) {
+            case NEST -> tickSleepAtNest(server);
+            case BED -> tickSleepInBed(server);
+            case NONE -> {
+                if (sleeping) {
+                    wakeUp();
+                }
+            }
+        }
+    }
+
+    /** 有巢物种：走到巢心 3 格内就地躺下（不需要床）。 */
+    private void tickSleepAtNest(ServerLevel server) {
+        if (nestPos == null) {
+            if (sleeping) {
+                wakeUp();
+            }
+            return;
+        }
+        double distSq = distSqToNest(this.position());
+        if (!com.linguauniversalis.core.behavior.SleepRules.canSleepAtNest(distSq)) {
+            // 还没到巢心 3 格：解除睡眠、走过去
+            if (sleeping) {
+                wakeUp();
+            }
+            this.getNavigation().moveTo(nestPos.getX() + 0.5, nestPos.getY(), nestPos.getZ() + 0.5, 1.0);
+            return;
+        }
+        if (sleeping) {
+            // 就地睡着：什么都不做（不锁速度、不每 tick 停导航）——
+            // 她自己不会再主动走（散步/跟随/战斗都在下面被睡眠挡住），但玩家可以把睡着的她推来推去。
+            return;
+        }
+        fallAsleep(false, nestPos);
+    }
+
+    /** 无巢伙伴：找一张尺寸匹配的魔物床，走过去躺下（一张床只睡一只）。 */
+    private void tickSleepInBed(ServerLevel server) {
+        if (sleeping) {
+            // 已睡着：同理不锁死（可被推动）；床被破坏就起床
+            if (!isSleepingInBed()) {
+                wakeUp();
+            }
+            return;
+        }
+        BlockPos bed = sleepPos;
+        if (bed == null || !(this.level().getBlockState(bed).getBlock()
+                instanceof com.linguauniversalis.block.MonsterBedBlock bedBlock)
+                || !com.linguauniversalis.core.behavior.SleepRules.bedMatchesSize(
+                        com.linguauniversalis.core.behavior.SleepRules.sizeOf(profile()), bedBlock.sizeClass())
+                || isBedClaimedByOther(server, bed)) {
+            if (bedSearchTicks-- > 0) {
+                return;
+            }
+            bedSearchTicks = com.linguauniversalis.core.behavior.SleepRules.BED_SEARCH_INTERVAL_TICKS;
+            bed = findFreeBed(server);
+            this.sleepPos = bed;
+            if (bed == null) {
+                return; // 附近没有合适的床：继续游荡
+            }
+        }
+        // 躺下位置取**两格交界的中点**（不是某一半的中心，否则会偏床头/床尾）
+        net.minecraft.world.level.block.state.BlockState bedState = this.level().getBlockState(bed);
+        net.minecraft.core.Direction bedFacing = bedState.hasProperty(
+                net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING)
+                ? bedState.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING)
+                : null;
+        boolean headHalf = bedState.hasProperty(com.linguauniversalis.block.MonsterBedBlock.PART)
+                && bedState.getValue(com.linguauniversalis.block.MonsterBedBlock.PART)
+                        == net.minecraft.world.level.block.state.properties.BedPart.HEAD;
+        double[] centerOffset = com.linguauniversalis.core.behavior.SleepRules.bedCenterOffset(
+                headHalf, bedFacing == null ? 0 : bedFacing.getStepX(),
+                bedFacing == null ? 0 : bedFacing.getStepZ());
+        double bedCenterX = bed.getX() + 0.5 + centerOffset[0];
+        double bedCenterZ = bed.getZ() + 0.5 + centerOffset[1];
+        double distSq = this.distanceToSqr(bedCenterX, bed.getY(), bedCenterZ);
+        if (com.linguauniversalis.core.behavior.SleepRules.canSleepOnBed(distSq)) {
+            this.getNavigation().stop();
+            // 走到床边后"躺下"：位置用原版 startSleeping 同一套落点（床面 + 0.6875 格），
+            // 让脚落在床面上（接地）；<b>不改碰撞箱</b>、不用 Pose.SLEEPING（那是玩家那套 0.2 格趴姿）。
+            if (!sleeping) {
+                this.setPos(bedCenterX, bed.getY() + com.linguauniversalis.core.behavior.SleepRules.BED_SURFACE_Y_OFFSET,
+                        bedCenterZ);
+                // 朝向与床头一致（原版床边躺下也是这个朝向）
+                if (bedFacing != null) {
+                    this.setYRot(bedFacing.toYRot());
+                    this.yHeadRot = bedFacing.toYRot();
+                    this.yBodyRot = bedFacing.toYRot();
+                }
+            }
+            fallAsleep(true, bed);
+        } else {
+            this.getNavigation().moveTo(bedCenterX, bed.getY(), bedCenterZ, 1.0);
+        }
+    }
+
+    /** 进入睡眠（床 = inBed；巢穴 = 就地）。 */
+    private void fallAsleep(boolean inBed, BlockPos pos) {
+        if (sleeping && java.util.Objects.equals(sleepPos, pos)) {
+            return;
+        }
+        this.sleeping = true;
+        this.sleepPos = pos;
+        this.getNavigation().stop();
+        this.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
+        syncVisualState();
+    }
+
+    /** 附近找一张"尺寸匹配且没被别的个体占"的魔物床。 */
+    private BlockPos findFreeBed(ServerLevel server) {
+        com.linguauniversalis.core.behavior.SleepRules.SizeClass size =
+                com.linguauniversalis.core.behavior.SleepRules.sizeOf(profile());
+        double radius = com.linguauniversalis.core.behavior.SleepRules.BED_SEARCH_RADIUS_BLOCKS;
+        int r = (int) Math.ceil(radius);
+        BlockPos origin = this.blockPosition();
+        BlockPos best = null;
+        double bestSq = Double.MAX_VALUE;
+        for (BlockPos candidate : BlockPos.betweenClosed(origin.offset(-r, -3, -r), origin.offset(r, 3, r))) {
+            if (!(server.getBlockState(candidate).getBlock()
+                    instanceof com.linguauniversalis.block.MonsterBedBlock bedBlock)) {
+                continue;
+            }
+            if (!com.linguauniversalis.core.behavior.SleepRules.bedMatchesSize(size, bedBlock.sizeClass())) {
+                continue;
+            }
+            double distSq = candidate.distSqr(origin);
+            if (distSq >= bestSq) {
+                continue;
+            }
+            BlockPos immutable = candidate.immutable();
+            if (isBedClaimedByOther(server, immutable)) {
+                continue;
+            }
+            bestSq = distSq;
+            best = immutable;
+        }
+        return best;
+    }
+
+    /** 这张床是否已经被别的个体占了（一张床只睡一只）。 */
+    private boolean isBedClaimedByOther(ServerLevel server, BlockPos bed) {
+        for (MonsterGirlEntity other : server.getEntitiesOfClass(MonsterGirlEntity.class,
+                new net.minecraft.world.phys.AABB(bed).inflate(4.0))) {
+            if (other != this && other.sleepPos() != null && other.sleepPos().distSqr(bed) <= 8.0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** 服务端：把"表现输入"广播到客户端（仅变化时发包）。 */
     private void syncVisualState() {
         net.minecraft.network.syncher.SynchedEntityData data = this.getEntityData();
@@ -500,21 +816,59 @@ public class MonsterGirlEntity extends PathfinderMob
         data.set(DATA_ANIM_JUMP, animJumpUntilTick >= 0 && this.tickCount < animJumpUntilTick);
         data.set(DATA_ANIM_EAT, animEatUntilTick >= 0 && this.tickCount < animEatUntilTick);
         data.set(DATA_OBEY_MODE, obeyModeId == null ? CommandMode.FOLLOW.englishId : obeyModeId);
-        data.set(DATA_LOOK_TARGET_ID, syncLookTargetId);
+        // 睡眠与"只有主人看得到的状态牌"
+        data.set(DATA_AIRBORNE, airborneVisual);
+        data.set(DATA_SLEEPING, sleeping);
+        data.set(DATA_COMPANION, girlState.isCompanion());
+        data.set(DATA_OWNER_UUID, girlState.boundPlayerUuid() == null ? "" : girlState.boundPlayerUuid());
+        // 状态牌输入：战斗模式 / 倒地 / 倒地倒计时（秒）
+        data.set(DATA_COMBAT_MODE, combatMode.id());
+        data.set(DATA_DOWNED, girlState.downed());
+        data.set(DATA_DOWNED_SECONDS,
+                com.linguauniversalis.core.behavior.StatusPlateRules.secondsFromTicks(girlState.downedLockTicks()));
+        // 手上物品 → 客户端定位组渲染（本方法只在服务端状态机里调用，客户端不会覆盖这两个值）
+        setHandVisual(DATA_MAIN_HAND_ITEM, handVisualCopy(InteractionHand.MAIN_HAND));
+        setHandVisual(DATA_OFF_HAND_ITEM, handVisualCopy(InteractionHand.OFF_HAND));
     }
 
-    /** 当前是否为伪装形态（猫形）。 */
+    /** 当前变形形态 id（空串 = 本体形态）。 */
+    public String disguiseFormId() {
+        return this.getEntityData().get(DATA_DISGUISE_FORM);
+    }
+
+    /** 当前形态定义（未变形/未登记 → null）。 */
+    public com.linguauniversalis.core.species.DisguiseForm disguiseForm() {
+        return com.linguauniversalis.core.species.DisguiseRegistry.get(disguiseFormId());
+    }
+
+    /** 当前是否处于变形形态（任意形态，不再限于"猫形"）。 */
+    public boolean isDisguised() {
+        return !disguiseFormId().isEmpty();
+    }
+
+    /** 兼容旧名：是否处于猫形伪装（= 处于 nekomata_cat 形态）。 */
     public boolean isCatForm() {
-        return this.getEntityData().get(DATA_CAT_FORM);
+        return com.linguauniversalis.core.species.DisguiseRegistry.NEKOMATA_CAT.equals(disguiseFormId());
     }
 
-    /** 切换伪装形态（会同步客户端并刷新碰撞箱尺寸）。 */
-    public void setCatForm(boolean catForm) {
-        if (this.getEntityData().get(DATA_CAT_FORM) == catForm) {
+    /** 切换到指定变形形态（空/未登记 = 回到本体形态），并刷新碰撞箱。 */
+    public void setDisguiseForm(String formId) {
+        String wanted = formId == null ? "" : formId.trim();
+        if (!wanted.isEmpty() && !com.linguauniversalis.core.species.DisguiseRegistry.contains(wanted)) {
+            wanted = ""; // 未登记的形态：宁可不变形，也不要画成空气
+        }
+        if (wanted.equals(disguiseFormId())) {
             return;
         }
-        this.getEntityData().set(DATA_CAT_FORM, catForm);
+        this.getEntityData().set(DATA_DISGUISE_FORM, wanted);
         this.refreshDimensions();
+    }
+
+    /** 进入/退出该物种登记的变形形态。 */
+    public void setDisguised(boolean disguised) {
+        com.linguauniversalis.core.species.DisguiseForm form =
+                com.linguauniversalis.core.behavior.DisguiseRules.formOf(profile());
+        setDisguiseForm(disguised && form != null ? form.id() : "");
     }
 
     /**
@@ -528,7 +882,7 @@ public class MonsterGirlEntity extends PathfinderMob
             return;
         }
         this.lastRevealTick = nowTick;
-        setCatForm(false);
+        setDisguised(false);
     }
 
     /**
@@ -541,8 +895,11 @@ public class MonsterGirlEntity extends PathfinderMob
      */
     @Override
     protected net.minecraft.world.entity.EntityDimensions getDefaultDimensions(net.minecraft.world.entity.Pose pose) {
-        if (isCatForm()) {
-            return net.minecraft.world.entity.EntityDimensions.scalable(0.6f, 0.7f).withEyeHeight(0.5f);
+        com.linguauniversalis.core.species.DisguiseForm form = disguiseForm();
+        if (form != null) {
+            // 变形形态的碰撞箱由形态定义给出（新物种加形态不用改这里）
+            return net.minecraft.world.entity.EntityDimensions.scalable((float) form.width(), (float) form.height())
+                    .withEyeHeight((float) form.eyeHeight());
         }
         com.linguauniversalis.core.species.BodyRules.Size size =
                 com.linguauniversalis.core.species.BodyRules.of(profile(),
@@ -556,18 +913,238 @@ public class MonsterGirlEntity extends PathfinderMob
 
     /** 伪装形态 tick：人形静默超时 → 恢复伪装（猫形）。 */
     private void tickDisguise(ServerLevel server) {
-        if (!com.linguauniversalis.core.behavior.DisguiseRules.hasDisguise(profile())
-                || !com.linguauniversalis.core.behavior.DisguiseRules.disguisesAtStage(girlState.isCompanion())) {
+        if (!com.linguauniversalis.core.behavior.DisguiseRules.hasDisguise(profile())) {
             return;
         }
-        if (isCatForm() || lastRevealTick < 0) {
+        if (!com.linguauniversalis.core.behavior.DisguiseRules.disguisesAtStage(girlState.isCompanion())) {
+            // 伙伴档：伪装习性失效。若还停在猫形（例如在猫形状态下被誓约），
+            // 直接恢复本体 —— 否则她会永远卡在猫形（revealHumanForm 对伙伴档不生效）。
+            // 唯一例外：正陪玩家睡觉的猫形（醒来时才还原）。
+            if (isDisguised() && !isSleepingWithOwnerVisual()) {
+                setDisguised(false);
+            }
+            return;
+        }
+        if (isDisguised() || lastRevealTick < 0) {
             return;
         }
         long revert = com.linguauniversalis.core.behavior.DisguiseRules.revertTicks(profile());
         if (com.linguauniversalis.core.behavior.DisguiseRules.shouldRevert(
                 server.getGameTime(), lastRevealTick, revert)) {
-            setCatForm(true);
+            setDisguised(true);
         }
+    }
+
+    // ------------------------------------------------------------------ 强制状态（调试棒）
+    /** 被"状态切换棒"强制的状态（服务端权威，随存档保存）；NORMAL = 不强制。 */
+    private com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState forcedState =
+            com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState.NORMAL;
+
+    /** 当前的强制状态。 */
+    public com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState forcedState() {
+        return forcedState;
+    }
+
+    /**
+     * 设置强制状态（调试棒用）；返回切换后的状态。
+     *
+     * <p>立即生效一次，之后由 {@link #tickForcedState} 每 tick 重新施加 ⇒ 休眠时钟、锁血倒计时都改不动它。
+     */
+    public com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState setForcedState(
+            com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState state) {
+        this.forcedState = state == null
+                ? com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState.NORMAL
+                : state;
+        applyForcedState();
+        syncVisualState();
+        return this.forcedState;
+    }
+
+    /** 把强制状态施加到实体上（一次；"强制正常/自然"都会清休眠与倒地）。 */
+    private void applyForcedState() {
+        switch (forcedState) {
+            case DORMANT -> {
+                if (girlState.downed()) {
+                    girlState.setDowned(false);
+                }
+                wakeUp();
+                girlState.setDormant(true);
+            }
+            case DOWNED -> {
+                if (girlState.dormant()) {
+                    girlState.setDormant(false);
+                }
+                wakeUp();
+                setupForcedKnockdown();
+            }
+            case FORCED_NORMAL, NORMAL -> {
+                // 强制正常 = 每 tick 清一次；自然 = 只在切换时清一次（之后交给自然逻辑）
+                if (girlState.downed()) {
+                    girlState.setDowned(false);
+                }
+                if (girlState.dormant()) {
+                    girlState.setDormant(false);
+                }
+            }
+        }
+    }
+
+    /** 强制战败：倒地 + 满额锁血 + 至少 1 血（免得被当成已死）。 */
+    private void setupForcedKnockdown() {
+        if (!girlState.downed()) {
+            com.linguauniversalis.core.rule.KnockdownRules.beginKnockdown(girlState);
+        }
+        girlState.setDownedLockTicks(com.linguauniversalis.core.ModConstants.KNOCKDOWN_LOCK_TICKS);
+        if (this.getHealth() > this.getMaxHealth()) {
+            this.setHealth(this.getMaxHealth());
+        }
+        if (this.getHealth() < 1.0F) {
+            this.setHealth(1.0F);
+        }
+    }
+
+    /**
+     * 每 tick 重新施加强制状态（"强制切换的状态会一直保持"）。
+     *
+     * <p>放在休眠时钟与锁血倒计时之后执行，所以自然流转改不动它。
+     */
+    private void tickForcedState(ServerLevel server) {
+        if (forcedState.isNatural()) {
+            return; // 自然档：不持续施加（切过来时已经清过一次）
+        }
+        applyForcedState();
+    }
+
+    // ------------------------------------------------------------------ 睡眠（床 / 巢穴）
+    /** 当前是否在睡（服务端权威）。 */
+    private boolean sleeping;
+    /** 睡处坐标（床或巢穴旁的就地位置）；未睡为 null。 */
+    private BlockPos sleepPos;
+    /** 找床重算计时（tick）。 */
+    private int bedSearchTicks;
+    /** 上一 tick 的好感值（-1 = 尚未初始化）——用于"好感变化时冒爱心/愤怒粒子"。 */
+    private int lastAffectionSeen = -1;
+    /**
+     * 待机锚点：下"待机"命令时记下她当时的位置。
+     *
+     * <p>设计汇总 §4「伙伴取食」：待命时饿了会离开待命点去伙伴宝箱取食**再回来** ——
+     * 锚点就是"待命点"，取食/被推走之后她自己走回去重新坐下。
+     */
+    private BlockPos standbyAnchor;
+    /** 待命回位的重算寻路计时（tick）。 */
+    private long standbyRepathTick = -1L;
+
+    /** 是否正在睡觉（服务端权威）。 */
+    public boolean isSleeping() {
+        return sleeping;
+    }
+
+    /** 客户端表现：是否应播悬空动画（服务端权威，见 {@link #DATA_AIRBORNE}）。 */
+    public boolean isAirborneVisual() {
+        return this.getEntityData().get(DATA_AIRBORNE);
+    }
+
+    /** 客户端表现：是否正在睡觉（动画用）。 */
+    public boolean isSleepingVisual() {
+        return this.getEntityData().get(DATA_SLEEPING);
+    }
+
+    /** 客户端表现：是否伙伴档（头顶状态牌只对伙伴显示）。 */
+    public boolean isCompanionVisual() {
+        return this.getEntityData().get(DATA_COMPANION);
+    }
+
+    /** 客户端表现：绑定玩家 UUID（空串 = 未绑定）。 */
+    public String ownerUuidVisual() {
+        return this.getEntityData().get(DATA_OWNER_UUID);
+    }
+
+    /** 是否睡在床上（区别于在巢穴旁就地睡）；床的右键叫醒用它判定。 */
+    public boolean isSleepingInBed() {
+        return sleeping && sleepPos != null && this.level() != null
+                && this.level().getBlockState(sleepPos).getBlock() instanceof com.linguauniversalis.block.MonsterBedBlock;
+    }
+
+    /** 睡处坐标（未睡 → null）。 */
+    public BlockPos sleepPos() {
+        return sleepPos;
+    }
+
+    /** 起床（同时停止寻路）。 */
+    public void wakeUp() {
+        if (!sleeping) {
+            return;
+        }
+        this.sleeping = false;
+        this.sleepPos = null;
+        this.getNavigation().stop();
+        // 起床后立刻往前挪出床（原版村民起床是走开；这里至少别卡在床面中央）
+        net.minecraft.core.Direction facing = this.getDirection();
+        this.setPos(this.getX() + facing.getStepX() * 0.6, this.getY(), this.getZ() + facing.getStepZ() * 0.6);
+        syncVisualState();
+    }
+
+    /**
+     * 强制"脸朝自己该朝的方向"：头朝向拉回身体朝向、俯仰归零。
+     *
+     * <p>用于睡觉 / 休眠 / 战败三态 —— 这时候她不该盯着玩家，也不该被原版 {@code LookControl}
+     * 带着去盯别的生物。每 tick 在 tick 末尾执行一次，覆盖掉 AI 期间产生的任何视线目标。
+     */
+    private void freezeFacing() {
+        this.setYHeadRot(this.yBodyRot);
+        this.setXRot(0.0F);
+        this.yHeadRotO = this.yBodyRot;
+        this.xRotO = 0.0F;
+    }
+
+    // ------------------------------------------------------------------ 战斗模式（被动/主动）
+    /** 战斗模式（服务端权威；客户端读同步值画状态牌）。 */
+    private com.linguauniversalis.core.behavior.CombatModeRules.CombatMode combatMode =
+            com.linguauniversalis.core.behavior.CombatModeRules.DEFAULT_MODE;
+
+    /** 当前战斗模式（服务端权威值）。 */
+    public com.linguauniversalis.core.behavior.CombatModeRules.CombatMode combatMode() {
+        return combatMode;
+    }
+
+    /** 客户端表现：当前战斗模式（读同步值）。 */
+    public com.linguauniversalis.core.behavior.CombatModeRules.CombatMode combatModeVisual() {
+        return com.linguauniversalis.core.behavior.CombatModeRules.CombatMode.byId(
+                this.getEntityData().get(DATA_COMBAT_MODE));
+    }
+
+    /** 设置战斗模式（同步客户端）。被动 = 只挨打后反击；主动 = 帮主人打架。 */
+    public void setCombatMode(com.linguauniversalis.core.behavior.CombatModeRules.CombatMode mode) {
+        com.linguauniversalis.core.behavior.CombatModeRules.CombatMode wanted =
+                mode == null ? com.linguauniversalis.core.behavior.CombatModeRules.DEFAULT_MODE : mode;
+        if (wanted == combatMode) {
+            return;
+        }
+        this.combatMode = wanted;
+        this.getEntityData().set(DATA_COMBAT_MODE, wanted.id());
+        if (wanted == com.linguauniversalis.core.behavior.CombatModeRules.CombatMode.PASSIVE
+                && combatTarget != null
+                && this.level() instanceof ServerLevel server
+                && !isProvokedTargetStillValid(combatTarget, server.getGameTime())) {
+            // 切回被动：立刻放弃"帮主人打"的目标（自己被打的目标仍按被惹记忆保留）
+            combatTarget = null;
+        }
+    }
+
+    /** 切换被动 ↔ 主动，返回切换后的模式。 */
+    public com.linguauniversalis.core.behavior.CombatModeRules.CombatMode toggleCombatMode() {
+        setCombatMode(com.linguauniversalis.core.behavior.CombatModeRules.toggle(combatMode));
+        return combatMode;
+    }
+
+    /** 客户端表现：是否倒地（战败）。 */
+    public boolean isDownedVisual() {
+        return this.getEntityData().get(DATA_DOWNED);
+    }
+
+    /** 客户端表现：倒地锁血剩余秒数（0 = 锁血结束 = 濒死）。 */
+    public int downedSecondsVisual() {
+        return this.getEntityData().get(DATA_DOWNED_SECONDS);
     }
 
     // ------------------------------------------------------------------ state 访问
@@ -601,7 +1178,12 @@ public class MonsterGirlEntity extends PathfinderMob
                 || stack.getItem() == LURegistries.PAPER_OF_VOW.get()
                 || stack.getItem() == LURegistries.DEBUG_GIRL_REMOVER.get()
                 || stack.getItem() == LURegistries.DEBUG_AFFECTION.get()
-                || stack.getItem() == LURegistries.DEBUG_AFFECTION_1.get();
+                || stack.getItem() == LURegistries.DEBUG_AFFECTION_1.get()
+                || stack.getItem() == LURegistries.DEBUG_NEGATIVE_AFFECTION.get()
+                || stack.getItem() == LURegistries.DEBUG_BIG_NEGATIVE_AFFECTION.get()
+                || stack.getItem() == LURegistries.DEBUG_STATE_STICK.get()
+                || stack.getItem() == LURegistries.DEBUG_FAMINE_FRUIT.get()
+                || stack.getItem() == LURegistries.DEBUG_SATIETY_FRUIT.get();
     }
 
     public String obeyModeId() {
@@ -655,7 +1237,7 @@ public class MonsterGirlEntity extends PathfinderMob
             getAttribute(Attributes.MAX_HEALTH).setBaseValue(profile().maxHealth());
         }
         this.setHealth(this.getMaxHealth());
-        // 领地巡游纲"无巢狂暴"：模板默认 true；刷怪蛋生成的个体 = false（避免出生即狂暴）
+        // 领地巡游"无巢狂暴"：模板默认 true；刷怪蛋生成的个体 = false（避免出生即狂暴）
         this.rageWithoutNest = !isEggSpawnReason(reason)
                 && com.linguauniversalis.core.behavior.OrdoTemplates.of(profile())
                         .ragesWithoutNest(profile());
@@ -663,7 +1245,7 @@ public class MonsterGirlEntity extends PathfinderMob
         // 伪装形态：有伪装习性的物种在野生/友善档默认以伪装形态出现（伙伴档失效）
         if (com.linguauniversalis.core.behavior.DisguiseRules.hasDisguise(profile())
                 && com.linguauniversalis.core.behavior.DisguiseRules.disguisesAtStage(girlState.isCompanion())) {
-            setCatForm(true);
+            setDisguised(true);
         }
         return data;
     }
@@ -808,6 +1390,13 @@ public class MonsterGirlEntity extends PathfinderMob
     private long chestErrandUntilTick = -1L;
     /** 跑腿途中下次重下寻路的 tick。 */
     private long chestErrandRepathTick = -1L;
+    /**
+     * 这趟跑腿是否为"饿了去取食"。
+     *
+     * <p>设计汇总 §4：<b>待命时饿了会离开待命点去最近的伙伴宝箱取食再回来</b> ——
+     * 所以命令虽然压过"自主移动"，但"饿了取食"是它的<b>明确例外</b>。
+     */
+    private boolean chestErrandForFood;
     /** 白跑一趟之后的冷却截止 tick（-1 = 不在冷却）。 */
     private long chestErrandCooldownUntil = -1L;
 
@@ -1068,6 +1657,13 @@ public class MonsterGirlEntity extends PathfinderMob
         long now = server.getGameTime();
         // 1) 正在跑腿：继续靠近，到了就办事，超时就放弃
         if (chestErrandPos != null) {
+            // 玩家命令优先：中途改成待机/跟随 → 放弃这趟；但"饿了去取食"是命令的明确例外
+            // （设计汇总 §4：待命时饿了会离开待命点去伙伴宝箱取食）
+            if (CommandRules.blocksAutonomousMovement(obeyModeId) && !chestErrandForFood) {
+                clearChestErrand();
+                this.getNavigation().stop();
+                return;
+            }
             if (now > chestErrandUntilTick) {
                 clearChestErrand();
                 return;
@@ -1118,6 +1714,13 @@ public class MonsterGirlEntity extends PathfinderMob
                 wantsFood, hasDepositableItems())) {
             return;
         }
+        // 玩家命令优先（待机站定 / 跟随主人）：只有"饿了去取食"这一种跑腿被允许
+        // —— 设计汇总 §4「待命时饿了会离开待命点去最近的伙伴宝箱取食再回来」
+        // —— 已经站在箱子跟前的"原地存取"在上面就返回了，不受这条影响
+        if (CommandRules.blocksAutonomousMovement(obeyModeId) && !wantsFood) {
+            return;
+        }
+        chestErrandForFood = wantsFood;
         chestErrandPos = chest.getBlockPos();
         chestErrandUntilTick = now + com.linguauniversalis.core.behavior.InventoryBehaviorRules
                 .CHEST_ERRAND_TIMEOUT_TICKS;
@@ -1242,6 +1845,7 @@ public class MonsterGirlEntity extends PathfinderMob
         chestErrandPos = null;
         chestErrandUntilTick = -1L;
         chestErrandRepathTick = -1L;
+        chestErrandForFood = false;
     }
 
     /** 是否已经在"存取距离"内（2 格）。 */
@@ -1307,8 +1911,7 @@ public class MonsterGirlEntity extends PathfinderMob
         player.openMenu(new net.minecraft.world.SimpleMenuProvider(
                         (containerId, playerInventory, ignored) ->
                                 new com.linguauniversalis.menu.GirlInventoryMenu(containerId, playerInventory, this),
-                        net.minecraft.network.chat.Component.translatable(
-                                "gui.lingua_universalis.girl_inventory", this.getDisplayName())),
+                        this.guiTitle()),
                 buffer -> {
                     buffer.writeVarInt(this.getId());
                     buffer.writeUtf(this.speciesId);
@@ -1321,6 +1924,198 @@ public class MonsterGirlEntity extends PathfinderMob
         this.strollGoal = new WaterAvoidingRandomStrollGoal(this, 1.0);
         this.strollGoalEnabled = true;
         this.goalSelector.addGoal(7, this.strollGoal);
+        // 看人 / 四处张望：直接用原版宠物那两个目标（狼、猫同款），不再由实体代码强行死盯玩家
+        this.goalSelector.addGoal(8, new com.linguauniversalis.entity.GirlLookGoals.LookAtPlayer(this));
+        this.goalSelector.addGoal(9, new com.linguauniversalis.entity.GirlLookGoals.RandomLookAround(this));
+    }
+
+    /**
+     * 现在是否该"看人/四处张望"。
+     *
+     * <p>倒地、休眠、低落三种状态下她不该盯着人看；其余时候由原版
+     * {@code LookAtPlayerGoal} / {@code RandomLookAroundGoal} 自己决定（见 {@link com.linguauniversalis.entity.GirlLookGoals}）。
+     */
+    /** 已经被我们追加过"避让猫系魔物娘"目标的生物（弱引用，避免卸载后泄漏）。 */
+    private final java.util.Map<net.minecraft.world.entity.Mob, Boolean> catAwareMobs = new java.util.WeakHashMap<>();
+    /** 猫系特性扫描计时。 */
+    private int catTraitScanTicks;
+    /** {@code #lingua_universalis:scared_of_cats} —— 会被猫系魔物娘赶走的生物类型（数据包可扩展）。 */
+    private static final net.minecraft.tags.TagKey<net.minecraft.world.entity.EntityType<?>> SCARED_OF_CATS =
+            net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.ENTITY_TYPE,
+                    net.minecraft.resources.Identifier.parse(
+                            com.linguauniversalis.core.behavior.CatTraitRules.SCARED_OF_CATS_TAG));
+
+    /**
+     * 猫系特性：把附近的苦力怕 / 幻翼（以及数据包标进 {@code #lingua_universalis:scared_of_cats} 的生物）赶走。
+     *
+     * <p>做法是给这些生物**追加一个 {@code AvoidEntityGoal}**（避让"猫系魔物娘"），
+     * 让逃跑成为它自己的 AI 行为（会寻路、绕障碍），而不是我们每 tick 推它。
+     * 每个生物只加一次（弱引用表去重）。
+     */
+    private void tickCatTraits(ServerLevel server) {
+        if (!com.linguauniversalis.core.behavior.CatTraitRules.hasCatTraits(profile())) {
+            return;
+        }
+        if (++catTraitScanTicks < com.linguauniversalis.core.behavior.CatTraitRules.SCAN_INTERVAL_TICKS) {
+            return;
+        }
+        catTraitScanTicks = 0;
+        double radius = com.linguauniversalis.core.behavior.CatTraitRules.SCARE_RADIUS_BLOCKS;
+        for (net.minecraft.world.entity.PathfinderMob mob : server.getEntitiesOfClass(
+                net.minecraft.world.entity.PathfinderMob.class,
+                this.getBoundingBox().inflate(radius),
+                candidate -> candidate != this && candidate.isAlive()
+                        && candidate.getType().builtInRegistryHolder().is(SCARED_OF_CATS)
+                        // 苦力怕保持**原版完全不动**（任何额外目标都会干扰它"贴脸爆炸"的原版手感），
+                        // 只在它的原版逻辑里识别猫系魔物娘这件事另行处理。
+                        && !(candidate instanceof net.minecraft.world.entity.monster.Creeper))) {
+            // 说明：这里**不再排除苦力怕**。原版苦力怕的"躲猫"由 Mixin 挂在它自己的
+            // registerGoals 上，一旦原版内部结构变动（Mixin 静默失效），苦力怕就不怕猫又了；
+            // 直接在这里一并挂目标可以保证"怕猫又"这件事一定成立（重复挂目标也无害）。
+            if (catAwareMobs.containsKey(mob)) {
+                continue;
+            }
+            mob.goalSelector.addGoal(com.linguauniversalis.core.behavior.CatTraitRules.AUGMENT_GOAL_PRIORITY,
+                    new net.minecraft.world.entity.ai.goal.AvoidEntityGoal<>(mob, MonsterGirlEntity.class,
+                            (float) com.linguauniversalis.core.behavior.CatTraitRules.SCARE_RADIUS_BLOCKS,
+                            com.linguauniversalis.core.behavior.CatTraitRules.FLEE_WALK_SPEED,
+                            com.linguauniversalis.core.behavior.CatTraitRules.FLEE_SPRINT_SPEED,
+                            entity -> entity instanceof MonsterGirlEntity girl
+                                    && com.linguauniversalis.core.behavior.CatTraitRules.hasCatTraits(girl.profile())));
+            catAwareMobs.put(mob, Boolean.TRUE);
+        }
+    }
+
+
+
+    /**
+     * 待命回位：待命点记在 {@link #standbyAnchor}，她因"饿了取食"或被推走之后自己走回去。
+     *
+     * <p>不打断的情形（这时不该回位）：倒地/休眠/睡觉/交战/原地进食/正在取食跑腿、
+     * 或玩家已经换成别的命令（锚点会被清掉）。
+     */
+    private void tickStandbyReturn(ServerLevel server) {
+        if (standbyAnchor == null) {
+            return;
+        }
+        if (!CommandMode.STANDBY.englishId.equals(obeyModeId)) {
+            this.standbyAnchor = null;
+            return;
+        }
+        boolean blocked = girlState.downed() || girlState.dormant() || girlState.isDepressed() || sleeping
+                || hasCombatTarget() || isOnChestErrand() || chewTicks > 0;
+        double centerX = standbyAnchor.getX() + 0.5;
+        double centerY = standbyAnchor.getY();
+        double centerZ = standbyAnchor.getZ() + 0.5;
+        if (!CommandRules.shouldReturnToStandby(true, blocked, this.distanceToSqr(centerX, centerY, centerZ))) {
+            return; // 不需要回位（或在容差内 / 有更优先的事）
+        }
+        long now = server.getGameTime();
+        if (now < standbyRepathTick) {
+            return;
+        }
+        standbyRepathTick = now + 20L;
+        this.getNavigation().moveTo(centerX, centerY, centerZ, 1.0);
+    }
+
+    /**
+     * 好感变化反馈：**增加**冒爱心、**减少**冒村民愤怒云（服务端发包，周围玩家都看得到）。
+     *
+     * <p>规则层 {@link com.linguauniversalis.core.behavior.AffectionParticleRules}（纯规则，有断言）。
+     * 与"环境粒子发射器"是两套：那个是按物种变量持续冒，这里是事件驱动的一次性爆发。
+     */
+    private void tickAffectionParticles(ServerLevel server) {
+        int current = girlState.affection();
+        if (lastAffectionSeen < 0) {
+            lastAffectionSeen = current;
+            return;
+        }
+        if (current == lastAffectionSeen) {
+            return;
+        }
+        String particleId = com.linguauniversalis.core.behavior.AffectionParticleRules.particleFor(
+                lastAffectionSeen, current);
+        lastAffectionSeen = current;
+        if (particleId == null) {
+            return;
+        }
+        net.minecraft.core.particles.ParticleOptions options = resolveParticle(particleId);
+        if (options == null) {
+            return;
+        }
+        double r = com.linguauniversalis.core.behavior.AffectionParticleRules.BURST_RADIUS;
+        server.sendParticles(options, this.getX(),
+                this.getY() + com.linguauniversalis.core.behavior.AffectionParticleRules.BURST_Y_OFFSET,
+                this.getZ(), com.linguauniversalis.core.behavior.AffectionParticleRules.BURST_COUNT,
+                r, r, r, com.linguauniversalis.core.behavior.AffectionParticleRules.BURST_SPEED);
+    }
+
+    /**
+     * 环境粒子发射器（客户端）：按物种变量（{@code species.ambientParticle*}）在周围冒粒子。
+     *
+     * <p>数据驱动：粒子 id / 触发状态 / 间隔 / 颗数 / 半径 / 高度全在物种档案里，代码只执行。
+     * 用途举例：猫又掉毛、阿拉克涅滴蛛丝、心情低落冒黑雾、战败冒烟……
+     */
+    private void tickAmbientParticles() {
+        com.linguauniversalis.core.behavior.AmbientParticleRules.Spec spec =
+                com.linguauniversalis.core.behavior.AmbientParticleRules.specOf(profile());
+        if (spec == null) {
+            return;
+        }
+        boolean dormant = isDormantVisual();
+        boolean downed = isDownedVisual();
+        boolean depressed = girlState.isDepressed();
+        boolean aggressive = combatModeVisual()
+                == com.linguauniversalis.core.behavior.CombatModeRules.CombatMode.AGGRESSIVE;
+        if (!com.linguauniversalis.core.behavior.AmbientParticleRules.stateMatches(
+                spec.when(), dormant, downed, depressed, aggressive)) {
+            return;
+        }
+        long gameTime = this.level().getGameTime();
+        if (!com.linguauniversalis.core.behavior.AmbientParticleRules.dueAtTick(
+                gameTime, this.tickCount, spec.intervalTicks())) {
+            return;
+        }
+        net.minecraft.core.particles.ParticleOptions options = resolveParticle(spec.particleId());
+        if (options == null) {
+            return;
+        }
+        net.minecraft.util.RandomSource random = this.level().getRandom();
+        for (int i = 0; i < spec.count(); i++) {
+            double dx = (random.nextDouble() - 0.5) * 2.0 * spec.radius();
+            double dz = (random.nextDouble() - 0.5) * 2.0 * spec.radius();
+            double dy = spec.yOffset() + random.nextDouble() * 0.4 - 0.2;
+            this.level().addParticle(options, this.getX() + dx, this.getY() + dy, this.getZ() + dz,
+                    0.0, 0.0, 0.0);
+        }
+    }
+
+    /** 粒子 id → 粒子参数对象（未注册/不是可喷的粒子 → null，静默跳过）。 */
+    private static net.minecraft.core.particles.ParticleOptions resolveParticle(String particleId) {
+        net.minecraft.resources.Identifier id;
+        try {
+            id = net.minecraft.resources.Identifier.parse(particleId);
+        } catch (RuntimeException malformed) {
+            return null;
+        }
+        return net.minecraft.core.registries.BuiltInRegistries.PARTICLE_TYPE.get(id)
+                .map(net.minecraft.core.Holder::value)
+                .filter(type -> type instanceof net.minecraft.core.particles.ParticleOptions)
+                .map(type -> (net.minecraft.core.particles.ParticleOptions) type)
+                .orElse(null);
+    }
+
+    public boolean wantsToLookAround() {
+        // 进食/战斗/睡眠/战败/低落时都不盯玩家（规则层见 AttentionRules，有断言）
+        return com.linguauniversalis.core.behavior.AttentionRules.shouldLookAtPlayers(
+                girlState.downed(), girlState.dormant(), girlState.isDepressed(),
+                isEatAnimActive(), hasCombatTarget(), sleeping);
+    }
+
+    /** 随机张望的启停（战斗/进食/睡眠/倒地时不四处看，避免边打边甩头）。 */
+    public boolean wantsToGlanceAround() {
+        return com.linguauniversalis.core.behavior.AttentionRules.shouldGlanceAround(
+                girlState.downed(), girlState.dormant(), isEatAnimActive(), hasCombatTarget(), sleeping);
     }
 
     /**
@@ -1330,7 +2125,7 @@ public class MonsterGirlEntity extends PathfinderMob
      * 完全接管移动，避免与随机散步抢寻路导致原地打转）；其余（野生/友善/游荡命令）保持散步。
      */
     private void updateStrollGoal() {
-        boolean wantStroll = !girlState.downed() && !girlState.dormant();
+        boolean wantStroll = !girlState.downed() && !girlState.dormant() && !sleeping;
         if (wantStroll) {
             if (hasCombatTarget()) {
                 wantStroll = false; // 交战中：由 tickCombat 的追击寻路接管，别让随机散步抢路径
@@ -1360,18 +2155,32 @@ public class MonsterGirlEntity extends PathfinderMob
     @Override
     public void tick() {
         super.tick();
-        // 连续离地 tick 计数（客户端也要算：动画控制器只在客户端跑）——
-        // 用于过滤"刚进游戏那两 tick 还没落地"导致的 airborne 动画重置
+        // 连续离地 tick 计数：只作为服务端判定"真的悬空"的稳定门槛使用
+        // （客户端不再自己算悬空动画，改用同步的 DATA_AIRBORNE —— 见 isAirborneVisual）
         if (this.onGround()) {
             this.airborneTicks = 0;
         } else if (this.airborneTicks < Short.MAX_VALUE) {
             this.airborneTicks++;
         }
+        // 注视目标同步（客户端据此让头部追随）：只同步"活着的攻击目标/被看的实体"
+        if (!this.level().isClientSide()) {
+            net.minecraft.world.entity.LivingEntity look = this.getTarget();
+            int id = look != null && look.isAlive() ? look.getId() : -1;
+            if (this.getEntityData().get(DATA_LOOK_TARGET) != id) {
+                this.getEntityData().set(DATA_LOOK_TARGET, id);
+            }
+        }
         // 配置文件每秒自动重读一次（调动画倍速等数值不用重启游戏）
         com.linguauniversalis.core.config.LuSettings.get().pollForChanges();
         if (this.level().isClientSide()) {
+            tickAmbientParticles();
             return;
         }
+        // 悬空动画判定：服务端权威（稳定门槛见 AnimationRules.shouldShowAirborne），由 syncVisualState 同步
+        this.airborneVisual = com.linguauniversalis.core.anim.AnimationRules.shouldShowAirborne(
+                com.linguauniversalis.core.anim.AnimationRules.isAirborne(
+                        this.onGround(), this.isInWater() || this.isInLava(), this.isFallFlying()),
+                this.fallDistance, this.airborneTicks);
         if (!(this.level() instanceof ServerLevel server)) {
             return;
         }
@@ -1400,7 +2209,9 @@ public class MonsterGirlEntity extends PathfinderMob
         // 倒地：静止（可浮水）、推进锁血计时；饱食等自然衰减暂停
         if (girlState.downed()) {
             this.getNavigation().stop();
-            this.setDeltaMovement(0.0, this.isInWater() ? 0.05 : 0.0, 0.0);
+            // 只锁水平移动：垂直分量保留，重力照常 => 空中倒地会正常掉下来（水里仍是浮起）
+            net.minecraft.world.phys.Vec3 downedVelocity = this.getDeltaMovement();
+            this.setDeltaMovement(0.0, this.isInWater() ? 0.05 : downedVelocity.y, 0.0);
             KnockdownRules.tickKnockdown(girlState);
         }
 
@@ -1417,12 +2228,10 @@ public class MonsterGirlEntity extends PathfinderMob
 
         // 伪装形态：人形"无事"超过阈值 → 恢复猫形（伙伴档伪装习性失效）
         tickDisguise(server);
+        tickSleep(server);
 
         // 社交习性（猫又）：偷鱼 / 偷村民绿宝石 / 睡醒赠礼 / 猫形陪睡 / 亡灵视野心情
         tickSocialHabits(server);
-
-        // 待机看向：每 tick 面向身旁的绑玩家（连续驱动 LookControl，避免“看一眼就回正”）
-        tickLookAtOwner(server);
 
         // 物种专属敌意：目标选择 + 近战攻击（低落随机攻击模板也在此驱动）
         tickCombat(server);
@@ -1517,6 +2326,24 @@ public class MonsterGirlEntity extends PathfinderMob
             }
         }
 
+        // 强制状态（调试棒）：放在休眠时钟之后 ⇒ 一直保持
+        tickForcedState(server);
+
+        // 待命回位（取食/被推走后自己走回待命点）
+        tickStandbyReturn(server);
+
+        // 猫系特性：驱赶附近的苦力怕/幻翼（给它们追加避让目标，每生物只加一次）
+        tickCatTraits(server);
+
+        // 好感变化 → 爱心 / 村民愤怒粒子
+        tickAffectionParticles(server);
+
+        // 睡觉 / 休眠 / 战败：不主动面朝任何生物（原版 LookControl 可能被目标带着转头，这里拉回自身朝向）
+        if (com.linguauniversalis.core.behavior.AttentionRules.suppressesFacing(
+                girlState.downed(), girlState.dormant(), sleeping)) {
+            freezeFacing();
+        }
+
         // 表现输入同步（休眠/陪睡/动画窗口/命令模式）→ 客户端动画与猫形姿态
         syncVisualState();
     }
@@ -1535,8 +2362,8 @@ public class MonsterGirlEntity extends PathfinderMob
         if (!CommandMode.FOLLOW.englishId.equals(obeyModeId)) {
             return;
         }
-        if (girlState.downed() || girlState.dormant() || girlState.isDepressed()) {
-            return; // 倒地/休眠/低落不受指挥
+        if (girlState.downed() || girlState.dormant() || girlState.isDepressed() || sleeping) {
+            return; // 倒地/休眠/低落/睡觉不受指挥
         }
         String ownerUuid = girlState.boundPlayerUuid();
         if (ownerUuid == null) {
@@ -1562,7 +2389,7 @@ public class MonsterGirlEntity extends PathfinderMob
 
         double distSq = this.distanceToSqr(owner);
         if (distSq <= FOLLOW_STOP_DIST_SQ) {
-            // 已在主人身旁（≤6 格）：停步（面向由 tickLookAtOwner 每 tick 驱动）
+            // 已在主人身旁（≤6 格）：停步（面向交给原版 LookAtPlayerGoal）
             if (this.getNavigation().isInProgress()) {
                 this.getNavigation().stop();
             }
@@ -1576,48 +2403,6 @@ public class MonsterGirlEntity extends PathfinderMob
 
         // 6~32 格：寻路靠近主人
         this.getNavigation().moveTo(owner, 1.0);
-    }
-
-    // ------------------------------------------------------------------ 待机面向（绑玩家）
-    /**
-     * 每 tick 让魔物娘看向身旁的绑玩家（若有且未倒地/休眠/低落）。
-     *
-     * <p>MC 的 LookControl 每 tick 都会把"想看的目标"清零，只有本 tick 再次 setLookAt 才会
-     * 继续转视角——因此必须在每 tick 驱动，否则就会出现"快速看一眼随即回正"的抽搐。
-     */
-    /** 非绑定玩家也会被注视的半径（格；可用配置关闭）。 */
-    private static final double NEARBY_PLAYER_LOOK_RANGE = 8.0;
-
-    /**
-     * 注视目标：绑定玩家优先（12 格内），否则看最近的玩家（8 格内，可配置关闭）。
-     *
-     * <p>用 {@code setLookAt(实体, ...)} 会同时驱动<b>偏航与俯仰</b>，所以头部跟随视角的
-     * 俯仰分量也由此获得来源（渲染侧只负责把它叠加到 AllHead 的旋转上）。
-     */
-    private void tickLookAtOwner(ServerLevel server) {
-        this.syncLookTargetId = -1;
-        if (girlState.downed() || girlState.dormant() || girlState.isDepressed()) {
-            return;
-        }
-        String ownerUuid = girlState.boundPlayerUuid();
-        if (ownerUuid != null) {
-            ServerPlayer owner = resolveOwner(server, ownerUuid);
-            if (owner != null && !owner.isRemoved() && owner.isAlive() && owner.level() == this.level()
-                    && this.distanceToSqr(owner) <= FOLLOW_LOOK_DIST_SQ) {
-                this.getLookControl().setLookAt(owner, 20.0F, 40.0F);
-                this.syncLookTargetId = owner.getId();
-                return;
-            }
-        }
-        if (!com.linguauniversalis.core.config.LuSettings.get().lookAtNearbyPlayer()) {
-            return;
-        }
-        net.minecraft.world.entity.player.Player nearby =
-                server.getNearestPlayer(this, NEARBY_PLAYER_LOOK_RANGE);
-        if (nearby != null && nearby.isAlive() && !nearby.isSpectator()) {
-            this.getLookControl().setLookAt(nearby, 20.0F, 40.0F);
-            this.syncLookTargetId = nearby.getId();
-        }
     }
 
     /** 按 UUID 解析在线 ServerPlayer；解析失败返回 null。 */
@@ -1676,7 +2461,87 @@ public class MonsterGirlEntity extends PathfinderMob
      * 记录一次"被该生物攻击"（受击反击窗口内它可被反击），并<b>立即将其设为反击目标</b>
      * （即使攻击者位于巢心威胁范围之外——被惹即应敌视；完整"追击直至脱离视线"逻辑后续再接入）。
      */
+    /**
+     * 是否是**同一个主人的另一只伙伴**（用于杜绝内讧）。
+     *
+     * <p>判定：对方也是魔物娘、也是伙伴、且绑定的玩家与自己是同一个。
+     */
+    // ------------------------------------------------------------------ 音效（猫又 = 原版猫）
+
+    /** 是否是猫又（使用原版猫音效的物种）。 */
+    private boolean usesCatSounds() {
+        return "nekomata".equals(speciesId);
+    }
+
+    /**
+     * 原版猫的一套声音（26.2 把猫音效收进了 {@code CatSoundVariant}，
+     * 不再有 {@code SoundEvents.CAT_AMBIENT} 这种扁平字段）。
+     */
+    private static net.minecraft.world.entity.animal.feline.CatSoundVariant.CatSoundSet catSounds() {
+        var variant = net.minecraft.sounds.SoundEvents.CAT_SOUNDS
+                .get(net.minecraft.world.entity.animal.feline.CatSoundVariants.SoundSet.CLASSIC);
+        return variant == null ? null : variant.adultSounds();
+    }
+
+    @Override
+    protected net.minecraft.sounds.SoundEvent getAmbientSound() {
+        return usesCatSounds() && catSounds() != null ? catSounds().ambientSound().value() : null;
+    }
+
+    @Override
+    protected net.minecraft.sounds.SoundEvent getHurtSound(net.minecraft.world.damagesource.DamageSource source) {
+        return usesCatSounds() && catSounds() != null
+                ? catSounds().hurtSound().value() : super.getHurtSound(source);
+    }
+
+    @Override
+    protected net.minecraft.sounds.SoundEvent getDeathSound() {
+        return usesCatSounds() && catSounds() != null
+                ? catSounds().deathSound().value() : super.getDeathSound();
+    }
+
+    /** 陪睡呼噜（进入猫形陪睡时放一次）。 */
+    private void playPurrIfCat() {
+        if (usesCatSounds() && catSounds() != null) {
+            this.playSound(catSounds().purrSound().value(), 0.7F, 1.0F);
+        }
+    }
+
+    /**
+     * 猫系哈气（原版幻翼靠近真猫时会调 {@code Cat#hiss()}；这里给猫系魔物娘同一套表现）。
+     */
+    public void playHissIfCat() {
+        if (usesCatSounds() && catSounds() != null) {
+            this.playSound(catSounds().hissSound().value(), 0.8F, 1.0F);
+        }
+    }
+
+    /**
+     * 界面标题 = **该物种的名字**（语言文件优先，缺翻译回退档案里的中文名）。
+     *
+     * <p>标题不能写死，因为不同物种各有名字（猫又 / 阿拉克涅 / 数据包新增物种）。
+     */
+    public net.minecraft.network.chat.Component guiTitle() {
+        String key = "species." + speciesId() + ".name";
+        net.minecraft.network.chat.Component translated =
+                net.minecraft.network.chat.Component.translatable(key);
+        if (translated.getString().equals(key)) {
+            return net.minecraft.network.chat.Component.literal(profile().zhName());
+        }
+        return translated;
+    }
+
+    public boolean isSameOwnerCompanion(net.minecraft.world.entity.Entity other) {
+        return other instanceof MonsterGirlEntity otherGirl
+                && otherGirl != this
+                && girlState.isCompanion()
+                && otherGirl.girlState().isCompanion()
+                && java.util.Objects.equals(otherGirl.girlState().boundPlayerUuid(),
+                        girlState.boundPlayerUuid());
+    }
+
     public void markProvoked(LivingEntity attacker, long gameTick) {
+        wakeUp(); // 挨打就醒（睡着的个体被攻击时立刻起床）
         this.provokedByUuid = attacker.getStringUUID();
         this.provokedTick = gameTick;
         if (this.level() instanceof ServerLevel server
@@ -1689,6 +2554,12 @@ public class MonsterGirlEntity extends PathfinderMob
                     && attacker.getStringUUID().equals(girlState.boundPlayerUuid());
             if (boundOwner) {
                 return; // 友善/伙伴的绑玩家：只掉好感，不反击
+            }
+            // 同一个主人的其它伙伴打到自己（例如玩家横扫/误伤）：不当敌人，避免内讧
+            if (isSameOwnerCompanion(attacker)) {
+                this.provokedByUuid = "";
+                this.provokedTick = -1;
+                return;
             }
             this.combatTarget = attacker;
         }
@@ -1710,7 +2581,7 @@ public class MonsterGirlEntity extends PathfinderMob
         }
     }
 
-    // ------------------------------------------------------------------ 巢心（领地巡游纲核心）
+    // ------------------------------------------------------------------ 巢心（领地巡游核心）
     /**
      * 是否属于需要巢心做圆心/狂暴判定的领地守卫纲。
      * 以<b>物种巢穴变量</b>（{@link SpeciesProfile#hasNest()}）为总开关：
@@ -1764,13 +2635,13 @@ public class MonsterGirlEntity extends PathfinderMob
             outsideTerritory = !guard.inTerritory(this.getX(), this.getZ());
         }
 
-        // 狂暴状态推进（领地巡游纲：伙伴永不狂暴；无巢狂暴按 rageWithoutNest 开关）
+        // 狂暴状态推进（领地巡游：伙伴永不狂暴；无巢狂暴按 rageWithoutNest 开关）
         boolean companion = girlState.isCompanion();
         this.enraged = com.linguauniversalis.core.behavior.NestGuard.updateEnrage(
                 this.enraged, companion, this.rageWithoutNest,
                 nestExists, nestChunkLoaded, outsideTerritory);
 
-        // 外生息门·巢穴附近增益（设计 §13：生命恢复/力量/速度/抗性提升）
+        // 外生息·巢穴附近增益（设计 §13：生命恢复/力量/速度/抗性提升）
         tickNestBuff(server);
 
         // 被带离领地且未狂暴 → 尝试返回巢心（不打断命令/战斗/低落）
@@ -1788,11 +2659,11 @@ public class MonsterGirlEntity extends PathfinderMob
     }
 
     /**
-     * 外生息门·巢穴附近增益（设计 §13）：在领地范围内周期性获得
+     * 外生息·巢穴附近增益（设计 §13）：在领地范围内周期性获得
      * 生命恢复/力量/速度/抗性提升；离开领地或没有巢心则不再续期。
      */
     private void tickNestBuff(ServerLevel server) {
-        // 巢穴变量总开关：无巢穴物种（如猫又）即便属于外生息门也不获得"巢穴附近增益"
+        // 巢穴变量总开关：无巢穴物种（如猫又）即便属于外生息也不获得"巢穴附近增益"
         if (!profile().hasNest()) {
             return;
         }
@@ -1923,7 +2794,9 @@ public class MonsterGirlEntity extends PathfinderMob
             return;
         }
         stealEatAtTick = -1L;
-        this.playSound(net.minecraft.sounds.SoundEvents.GENERIC_EAT.value(), 1.0f, 1.0f);
+        this.playSound(usesCatSounds() && catSounds() != null
+                ? catSounds().eatSound().value()
+                : net.minecraft.sounds.SoundEvents.GENERIC_EAT.value(), 1.0F, 1.0F);
         playEatAnimation(14); // 偷吃 → main_eat 动画
     }
 
@@ -1951,7 +2824,7 @@ public class MonsterGirlEntity extends PathfinderMob
         // 偷窃属隐蔽行为：不向玩家通报（村民绿宝石进"她的背包"占位计数，Phase 3 接物品栏）
     }
 
-    /** 亡灵视野：视野内出现亡灵生物每天一次 +1 心情（幽暗目默认开启）。 */
+    /** 亡灵视野：视野内出现亡灵生物每天一次 +1 心情（幽暗默认开启）。 */
     private void tickUndeadSightMood(long day) {
         if (!com.linguauniversalis.core.behavior.SocialHabitRules.undeadSightMood(profile())) {
             return;
@@ -1983,13 +2856,30 @@ public class MonsterGirlEntity extends PathfinderMob
                     && com.linguauniversalis.core.behavior.SocialHabitRules.shouldSleepAsCat(
                     girlState.isCompanion(), standingBy, sleeping, distSq,
                     com.linguauniversalis.core.behavior.SocialHabitRules.SLEEP_AS_CAT_RANGE);
-            if (sleepAsCat) {
-                setCatForm(true);
+            // 走到玩家睡的床上再趴下：远处先赶路，只有贴到床边（≤1.5 格）才真的趴
+            net.minecraft.core.BlockPos ownerBed = owner == null ? null
+                    : owner.getSleepingPos().orElse(null);
+            boolean atBed = false;
+            if (sleepAsCat && ownerBed != null) {
+                double bedCenterX = ownerBed.getX() + 0.5D;
+                double bedCenterZ = ownerBed.getZ() + 0.5D;
+                atBed = this.distanceToSqr(bedCenterX, ownerBed.getY(), bedCenterZ) <= 2.25D;
+                if (!atBed) {
+                    this.getNavigation().moveTo(bedCenterX, ownerBed.getY(), bedCenterZ, 1.0D);
+                } else if (!sleepingAsCat) {
+                    this.getNavigation().stop();
+                }
+            }
+            if (sleepAsCat && atBed) {
+                if (!sleepingAsCat) {
+                    playPurrIfCat();
+                }
+                setDisguised(true);
                 sleepingAsCat = true;
-            } else if (sleepingAsCat) {
+            } else if (sleepingAsCat && !sleepAsCat) {
                 sleepingAsCat = false;
                 if (owner != null) {
-                    setCatForm(false); // 醒后恢复人形
+                    setDisguised(false); // 醒后恢复人形
                 }
             }
         }
@@ -2058,10 +2948,19 @@ public class MonsterGirlEntity extends PathfinderMob
     }
 
     private void tickCombat(ServerLevel server) {
-        // 巢心状态评估：认领/失效/狂暴（领地巡游纲）
+        // 巢心状态评估：认领/失效/狂暴（领地巡游）
         tickNestState(server);
-        if (girlState.downed() || girlState.dormant()) {
+        if (girlState.downed() || girlState.dormant() || sleeping) {
             combatTarget = null;
+            return; // 倒地/休眠/睡觉：不打也不索敌（挨打会被 markProvoked 叫醒）
+        }
+        // 主动模式防脱队：追出去太远就放弃目标、回主人身边（滞回：协助 32 格 / 回防 24 格）
+        net.minecraft.world.entity.player.Player returnOwner = boundOwner(server);
+        if (returnOwner != null && com.linguauniversalis.core.behavior.CombatModeRules.shouldReturnToOwner(
+                combatMode, girlState.boundPlayerUuid() != null, combatTarget != null,
+                this.distanceToSqr(returnOwner))) {
+            combatTarget = null;
+            this.getNavigation().moveTo(returnOwner, 1.0);
             return;
         }
         long now = server.getGameTime();
@@ -2080,12 +2979,19 @@ public class MonsterGirlEntity extends PathfinderMob
             combatTarget = null;
         }
 
-        // 目标重扫（10 tick 一次）：被惹反击目标在记忆窗口内不因重扫被丢弃（即使已在扫描框外）
+        // 主动模式：优先把"主人正在打的 / 打了主人的"生物设为目标（每 tick 读两个原版字段，开销极小）
+        LivingEntity assistTarget = ownerAssistTarget(server);
+        if (assistTarget != null && assistTarget != combatTarget) {
+            combatTarget = assistTarget;
+            revealHumanForm(com.linguauniversalis.core.behavior.DisguiseRules.Trigger.ATTACK, now);
+        }
+
+        // 目标重扫（10 tick 一次）：被惹反击/协助目标在记忆窗口内不因重扫被丢弃（即使已在扫描框外）
         hostileScanTicks++;
         boolean rescanned = false;
         if (hostileScanTicks % com.linguauniversalis.core.ModConstants.HOSTILE_SCAN_EVERY_TICKS == 0) {
             rescanned = true;
-            if (!isProvokedTargetStillValid(combatTarget, now)) {
+            if (!isProvokedTargetStillValid(combatTarget, now) && !isAssistWorthy(combatTarget)) {
                 boolean commanded = CommandRules.canCommand(girlState,
                         girlState.boundPlayerUuid() == null ? "" : girlState.boundPlayerUuid());
                 combatTarget = pickCombatTarget(server, now, !commanded);
@@ -2124,12 +3030,85 @@ public class MonsterGirlEntity extends PathfinderMob
         }
     }
 
+    // ------------------------------------------------------------------ 主动模式：帮主人打架
+    /** 绑定主人（在线才返回；不在线返回 null）。 */
+    private net.minecraft.world.entity.player.Player boundOwner(ServerLevel server) {
+        String uuid = girlState.boundPlayerUuid();
+        if (uuid == null || uuid.isEmpty()) {
+            return null;
+        }
+        try {
+            return server.getServer().getPlayerList().getPlayer(java.util.UUID.fromString(uuid));
+        } catch (IllegalArgumentException malformed) {
+            return null;
+        }
+    }
+
+    /**
+     * 主动模式下"该帮主人打的"目标：优先<b>打了主人的人</b>，其次<b>主人正在打的人</b>。
+     *
+     * <p>读原版 {@code LivingEntity#getLastHurtByMob} / {@code getLastHurtMob}：玩家不需要额外记账，
+     * 原版已经在挨打/出手时写好了这两个字段。
+     */
+    private LivingEntity ownerAssistTarget(ServerLevel server) {
+        if (!com.linguauniversalis.core.behavior.CombatModeRules.assistsOwner(combatMode)
+                || girlState.boundPlayerUuid() == null) {
+            return null;
+        }
+        net.minecraft.world.entity.player.Player owner = boundOwner(server);
+        if (owner == null || !owner.isAlive() || owner.isSpectator()) {
+            return null;
+        }
+        LivingEntity attackerOfOwner = owner.getLastHurtByMob();
+        if (isAssistCandidate(attackerOfOwner, owner)) {
+            return attackerOfOwner;
+        }
+        LivingEntity ownerTarget = owner.getLastHurtMob();
+        if (isAssistCandidate(ownerTarget, owner)) {
+            return ownerTarget;
+        }
+        return null;
+    }
+
+    /** 该生物是否"值得帮他打"（活着、不是主人/自己、在协助距离内、不是创造/旁观玩家）。 */
+    private boolean isAssistCandidate(LivingEntity candidate, net.minecraft.world.entity.player.Player owner) {
+        if (candidate == null || candidate == this || candidate == owner || !candidate.isAlive()
+                || candidate.isRemoved() || candidate.level() != this.level()) {
+            return false;
+        }
+        if (candidate instanceof net.minecraft.world.entity.player.Player player
+                && (player.isSpectator() || player.getAbilities().instabuild)) {
+            return false;
+        }
+        if (isSameOwnerCompanion(candidate)) {
+            return false; // 同主人的伙伴互相不算协助对象
+        }
+        double range = com.linguauniversalis.core.ModConstants.ASSIST_RANGE_BLOCKS;
+        return this.distanceToSqr(candidate) <= range * range;
+    }
+
+    /** 目标是否属于"主动模式协助对象"（用于重扫时不被敌意规则刷掉）。 */
+    private boolean isAssistWorthy(LivingEntity candidate) {
+        if (candidate == null
+                || !com.linguauniversalis.core.behavior.CombatModeRules.assistsOwner(combatMode)
+                || girlState.boundPlayerUuid() == null
+                || !(this.level() instanceof ServerLevel server)) {
+            return false;
+        }
+        net.minecraft.world.entity.player.Player owner = boundOwner(server);
+        if (owner == null) {
+            return false;
+        }
+        return isAssistCandidate(candidate, owner)
+                && (candidate == owner.getLastHurtByMob() || candidate == owner.getLastHurtMob());
+    }
+
     /** 在扫描半径内挑选满足敌意规则的最近目标；返回 null 表示无可攻击者。 */
     private LivingEntity pickCombatTarget(ServerLevel server, long now, boolean mayHunt) {
         LivingEntity best = null;
         double bestDistSq = Double.MAX_VALUE;
         double scanRadius = com.linguauniversalis.core.behavior.HostilityRules.maxScanRadius(profile());
-        // 威胁中心：有巢心则以巢心为圆心（领地巡游纲）；狂暴/无巢时以自身为中心大范围索敌
+        // 威胁中心：有巢心则以巢心为圆心（领地巡游）；狂暴/无巢时以自身为中心大范围索敌
         BlockPos center = enraged ? null : nestPos;
         double extra = enraged ? 16.0 : scanRadius;
         AABB box = (center != null
@@ -2141,6 +3120,13 @@ public class MonsterGirlEntity extends PathfinderMob
             LivingEntity target = (LivingEntity) candidate;
             // 创造/旁观玩家不作为敌意目标（同原版默认）
             if (target instanceof Player p && (p.isSpectator() || p.getAbilities().instabuild)) {
+                continue;
+            }
+            // 同一个玩家的伙伴之间不许互相打（玩家误伤其中一只时不会引发内讧）
+            if (girlState.isCompanion() && target instanceof MonsterGirlEntity otherGirl
+                    && otherGirl.girlState().isCompanion()
+                    && java.util.Objects.equals(otherGirl.girlState().boundPlayerUuid(),
+                            girlState.boundPlayerUuid())) {
                 continue;
             }
             com.linguauniversalis.core.behavior.HostilityRules.TargetKind kind = classify(target);
@@ -2173,7 +3159,14 @@ public class MonsterGirlEntity extends PathfinderMob
                     }
                 }
             }
-            // 命令权内（伙伴待命/跟随中）不允许主动狩猎，仅保留反击目标
+            // 协助目标（主动模式）：打了主人的 / 主人正在打的 —— 优先认，且不受敌意模板过滤
+            boolean assisting = isAssistWorthy(target);
+            if (assisting && selfSq < bestDistSq) {
+                bestDistSq = selfSq;
+                best = target;
+                continue;
+            }
+            // 命令权内（伙伴待命/跟随中）不允许主动狩猎，仅保留反击/协助目标
             boolean commanded = CommandRules.canCommand(girlState,
                     girlState.boundPlayerUuid() == null ? "" : girlState.boundPlayerUuid());
             if (commanded && !provoked) {
@@ -2196,9 +3189,14 @@ public class MonsterGirlEntity extends PathfinderMob
 
     /** 目标到巢心（方块中心）的距离平方。 */
     private double distSqToNest(LivingEntity target) {
-        double dx = target.getX() - (nestPos.getX() + 0.5);
-        double dy = target.getY() - (nestPos.getY() + 0.5);
-        double dz = target.getZ() - (nestPos.getZ() + 0.5);
+        return distSqToNest(target.position());
+    }
+
+    /** 任意坐标到巢心（方块中心）的距离平方。 */
+    private double distSqToNest(net.minecraft.world.phys.Vec3 position) {
+        double dx = position.x - (nestPos.getX() + 0.5);
+        double dy = position.y - (nestPos.getY() + 0.5);
+        double dz = position.z - (nestPos.getZ() + 0.5);
         return dx * dx + dy * dy + dz * dz;
     }
 
@@ -2250,7 +3248,7 @@ public class MonsterGirlEntity extends PathfinderMob
                     poisonTicks,
                     com.linguauniversalis.core.behavior.SpeciesAbilities.poisonAmplifier(profile())), this);
         }
-        // 近战附流血（猫又绒科：命中刷新 10 秒并等级 +1，无上限）
+        // 近战附流血（猫又绒：命中刷新 10 秒并等级 +1，无上限）
         long bleedRefresh = com.linguauniversalis.core.behavior.SpeciesAbilities.bleedRefreshTicks(profile());
         if (bleedRefresh > 0 && target.isAlive()) {
             bleedOn.computeIfAbsent(target.getStringUUID(),
@@ -2350,13 +3348,15 @@ public class MonsterGirlEntity extends PathfinderMob
             }
             int damage = bleed.pollDamage(now, interval);
             if (damage > 0) {
-                living.hurtServer(server, this.damageSources().mobAttack(this), damage);
+                if (!isSameOwnerCompanion(living)) {
+                    living.hurtServer(server, this.damageSources().mobAttack(this), damage);
+                }
             }
         }
     }
 
     /**
-     * 弹射物闪避（猫又绒科）：冷却就绪时免疫该次弹射物伤害并侧/后位移。
+     * 弹射物闪避（猫又绒）：冷却就绪时免疫该次弹射物伤害并侧/后位移。
      *
      * @return true = 已闪避（调用方应取消该次伤害）
      */
@@ -2387,6 +3387,10 @@ public class MonsterGirlEntity extends PathfinderMob
 
 
     // ------------------------------------------------------------------ 互动（摸头/投喂/命令/唤醒）
+    /**
+     * 右键互动入口。真正逻辑在 {@link #handleInteraction}；这里负责客户端手势分流，
+     * 并在服务端把"被本模组接管的交互"补一次**玩家挥臂**（摸头 / 用任何道具都要有这个动作）。
+     */
     @Override
     protected InteractionResult mobInteract(Player player, InteractionHand hand) {
         if (this.level().isClientSide()) {
@@ -2397,6 +3401,16 @@ public class MonsterGirlEntity extends PathfinderMob
             // 只要这次点按属于本模组会接管的交互，就返回 CONSUME，阻止引擎继续试副手/物品。
             return clientSideInteract(player, hand);
         }
+        InteractionResult result = handleInteraction(player, hand);
+        // 玩家挥臂（"使用物品"的动作）：服务端 swing(true) 会把动画广播给所有跟踪客户端
+        if (result != null && result.consumesAction()) {
+            player.swing(hand, true);
+        }
+        return result;
+    }
+
+    /** 服务端互动逻辑本体（摸头/投喂/命令/礼物/初稿 GUI/百神镜/调试道具…）。 */
+    private InteractionResult handleInteraction(Player player, InteractionHand hand) {
         long day = this.level().getOverworldClockTime() / com.linguauniversalis.core.ModConstants.DAY_TICKS;
         String actor = player.getStringUUID();
         boolean bonded = actor.equals(girlState.boundPlayerUuid());
@@ -2407,6 +3421,12 @@ public class MonsterGirlEntity extends PathfinderMob
         // 通用右键交互去抖兜底（每玩家 × 本个体）：极少数路径若仍被重复分发，
         // 0.1s 窗口内只放行一次；高频正常点击不受影响（窗口仅 2 tick）。
         if (!allowInteract(actor, nowTick)) {
+            return InteractionResult.SUCCESS;
+        }
+
+        // 命名牌：本模组禁用（她的头顶名牌由"状态牌"接管：被动/主动/休眠/战败倒计时/濒死）
+        if (stack.is(net.minecraft.world.item.Items.NAME_TAG)) {
+            tell(player, "Name tags do not work on her (status is shown on her name plate).");
             return InteractionResult.SUCCESS;
         }
 
@@ -2514,15 +3534,32 @@ public class MonsterGirlEntity extends PathfinderMob
 
         // 调试：移除工具 —— 手持右键瞬间移除该魔物娘（创造调试用）
         if (stack.getItem() == LURegistries.DEBUG_GIRL_REMOVER.get()) {
+            // 从玩家侧的伙伴登记表里一并抹掉（否则 /lu check 里还会留着这条记录）
+            com.linguauniversalis.core.companion.CompanionRegistry.removeByEntity(this.getStringUUID());
             this.discard();
             tell(player, "Debug: monster girl removed.");
             return InteractionResult.SUCCESS;
         }
 
-        // 调试：好感道具 —— 手持右键一次 +10（好感之实）或 +1（好感之实·一），不设每日上限
+        // 调试：状态切换棒 —— 右键循环 正常 → 休眠 → 战败 → 正常；强制状态一直保持（随存档）
+        if (stack.getItem() == LURegistries.DEBUG_STATE_STICK.get()) {
+            com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState next =
+                    com.linguauniversalis.core.behavior.ForcedStateRules.next(forcedState);
+            setForcedState(next);
+            tell(player, "Forced state -> " + next.id() + " (persists)");
+            return InteractionResult.SUCCESS;
+        }
+
+        // 调试：好感道具 —— 大好感 +10 / 好感 +1 / 负好感 -1 / 大负好感 -10（不设每日上限；减好感最低到 0）
         if (stack.getItem() == LURegistries.DEBUG_AFFECTION.get()
-                || stack.getItem() == LURegistries.DEBUG_AFFECTION_1.get()) {
-            int debugGain = stack.getItem() == LURegistries.DEBUG_AFFECTION_1.get() ? 1 : 10;
+                || stack.getItem() == LURegistries.DEBUG_AFFECTION_1.get()
+                || stack.getItem() == LURegistries.DEBUG_NEGATIVE_AFFECTION.get()
+                || stack.getItem() == LURegistries.DEBUG_BIG_NEGATIVE_AFFECTION.get()
+                || stack.getItem() == LURegistries.DEBUG_STATE_STICK.get()) {
+            int debugGain = stack.getItem() == LURegistries.DEBUG_AFFECTION.get() ? 10
+                    : stack.getItem() == LURegistries.DEBUG_AFFECTION_1.get() ? 1
+                    : stack.getItem() == LURegistries.DEBUG_BIG_NEGATIVE_AFFECTION.get() ? -10
+                    : -1;
             if (!bonded && girlState.boundPlayerUuid() != null) {
                 tell(player, "She is bound to someone else; debug affection refused.");
                 return InteractionResult.SUCCESS;
@@ -2531,16 +3568,37 @@ public class MonsterGirlEntity extends PathfinderMob
                 stack.shrink(1);
             }
             int before = girlState.affection();
-            girlState.addAffection(debugGain);
-            lastFriendlyGameDay = day; // 视为"当天有互动"，避免冷落/休眠误判
+            girlState.addAffection(debugGain); // setAffection 内部夹取 0..200 ⇒ 减好感不会减成负数
+            if (debugGain > 0) {
+                lastFriendlyGameDay = day; // 视为"当天有互动"，避免冷落/休眠误判（减好感不算互动）
+            }
             RelationshipRules.enforceCoherence(girlState);
             // 越 10 → 绑定为友善；越 100 → 永久伙伴（enforceCoherence 负责解锁）
             if (girlState.affection() >= com.linguauniversalis.core.ModConstants.FRIENDLY_MIN
                     && girlState.boundPlayerUuid() == null) {
                 girlState.setBoundPlayerUuid(actor);
             }
-            tell(player, "Debug affection: +" + (girlState.affection() - before) + " aff -> "
-                    + girlState.stageId() + " aff=" + girlState.affection());
+            int applied = girlState.affection() - before;
+            tell(player, "Debug affection: " + (applied >= 0 ? "+" : "") + applied + " aff (" + before + " -> "
+                    + girlState.affection() + ") -> " + girlState.stageId());
+            return InteractionResult.SUCCESS;
+        }
+
+        // 调试：饱食度道具 —— 饥馑之实 -2 / 饱和之实 +2（不设每日上限，不影响好感）
+        if (stack.getItem() == LURegistries.DEBUG_FAMINE_FRUIT.get()
+                || stack.getItem() == LURegistries.DEBUG_SATIETY_FRUIT.get()) {
+            if (!bonded && girlState.boundPlayerUuid() != null) {
+                tell(player, "She is bound to someone else; debug satiety refused.");
+                return InteractionResult.SUCCESS;
+            }
+            int delta = stack.getItem() == LURegistries.DEBUG_SATIETY_FRUIT.get() ? 2 : -2;
+            if (!player.getAbilities().instabuild) {
+                stack.shrink(1);
+            }
+            int before = girlState.satiety();
+            girlState.addSatiety(delta);
+            tell(player, "Debug satiety: " + (delta > 0 ? "+" : "") + delta + " (" + before + " -> "
+                    + girlState.satiety() + " / " + com.linguauniversalis.core.ModConstants.SATIETY_MAX + ")");
             return InteractionResult.SUCCESS;
         }
 
@@ -2639,6 +3697,17 @@ public class MonsterGirlEntity extends PathfinderMob
         return super.mobInteract(player, hand);
     }
 
+    /** 切换到待机时记下待命点；切走时清掉（回位逻辑见 {@link #tickStandbyReturn}）。 */
+    private void updateStandbyAnchor() {
+        if (CommandMode.STANDBY.englishId.equals(obeyModeId)) {
+            this.standbyAnchor = this.blockPosition().immutable();
+            this.standbyRepathTick = -1L;
+        } else {
+            this.standbyAnchor = null;
+            this.standbyRepathTick = -1L;
+        }
+    }
+
     private void cycleCommandMode() {
         CommandMode[] modes = CommandMode.values();
         int idx = 0;
@@ -2649,6 +3718,7 @@ public class MonsterGirlEntity extends PathfinderMob
             }
         }
         obeyModeId = modes[(idx + 1) % modes.length].englishId;
+        updateStandbyAnchor();
     }
 
     /**
@@ -2669,6 +3739,10 @@ public class MonsterGirlEntity extends PathfinderMob
         if (stack.has(DataComponents.FOOD)) {
             return InteractionResult.CONSUME;
         }
+        // 1.5) 命名牌：本模组禁用命名（她的头顶名牌由状态牌接管），客户端也认领这次点按
+        if (stack.is(net.minecraft.world.item.Items.NAME_TAG)) {
+            return InteractionResult.CONSUME;
+        }
         // 2) 本模组手持工具（初稿/百晓镜/礼物盒/急救箱/调试件）：右键一律由本模组接管
         Item it = stack.getItem();
         if (it == LURegistries.FIRST_DRAFT.get()) {
@@ -2682,7 +3756,12 @@ public class MonsterGirlEntity extends PathfinderMob
                 || it == LURegistries.FIRST_AID_KIT.get()
                 || it == LURegistries.DEBUG_GIRL_REMOVER.get()
                 || it == LURegistries.DEBUG_AFFECTION.get()
-                || it == LURegistries.DEBUG_AFFECTION_1.get()) {
+                || it == LURegistries.DEBUG_AFFECTION_1.get()
+                || it == LURegistries.DEBUG_NEGATIVE_AFFECTION.get()
+                || it == LURegistries.DEBUG_BIG_NEGATIVE_AFFECTION.get()
+                || it == LURegistries.DEBUG_STATE_STICK.get()
+                || it == LURegistries.DEBUG_FAMINE_FRUIT.get()
+                || it == LURegistries.DEBUG_SATIETY_FRUIT.get()) {
             return InteractionResult.CONSUME;
         }
         if (sneak) {
@@ -2732,7 +3811,14 @@ public class MonsterGirlEntity extends PathfinderMob
     private static final String TAG_NEST_Y = "LUNestY";
     private static final String TAG_NEST_Z = "LUNestZ";
     private static final String TAG_RAGE_WITHOUT_NEST = "LURageWithoutNest";
+    /** 旧档的猫形布尔标记（只读，兼容用）。 */
     private static final String TAG_CAT_FORM = "LUCatForm";
+    /** 变形形态 id（空串 = 本体形态）。 */
+    private static final String TAG_DISGUISE_FORM = "LUCatFormId";
+    /** 战斗模式 id（被动/主动）。 */
+    private static final String TAG_COMBAT_MODE = "LUCombatMode";
+    /** 调试棒强制状态 id（normal / dormant / downed）。 */
+    private static final String TAG_FORCED_STATE = "LUForcedState";
     private static final String TAG_PENDING_GIFT = "LUPendingGift";
     private static final String TAG_EMERALD_GIFT = "LUEmeraldGift";
     private static final String TAG_STOLEN_EMERALDS = "LUStolenEmeralds";
@@ -2755,7 +3841,9 @@ public class MonsterGirlEntity extends PathfinderMob
             out.putInt(TAG_NEST_Z, nestPos.getZ());
         }
         out.putBoolean(TAG_RAGE_WITHOUT_NEST, rageWithoutNest);
-        out.putBoolean(TAG_CAT_FORM, isCatForm());
+        out.putString(TAG_DISGUISE_FORM, disguiseFormId()); // 变形形态（空串 = 本体）
+        out.putString(TAG_COMBAT_MODE, combatMode.id());    // 战斗模式（被动/主动）
+        out.putString(TAG_FORCED_STATE, forcedState.id()); // 调试棒的强制状态
         out.putBoolean(TAG_PENDING_GIFT, pendingGift);
         out.putBoolean(TAG_EMERALD_GIFT, emeraldGiftArmed);
         out.putInt(TAG_STOLEN_EMERALDS, stolenEmeralds);
@@ -2772,6 +3860,9 @@ public class MonsterGirlEntity extends PathfinderMob
         String loadedSpecies = in.getStringOr(TAG_SPECIES, DEFAULT_SPECIES);
         setSpeciesId(loadedSpecies);
         obeyModeId = in.getStringOr(TAG_OBEY, CommandMode.FOLLOW.englishId);
+        // 读档不恢复待命锚点：下次下"待机"命令时重新记（避免拿旧坐标乱走）
+        this.standbyAnchor = null;
+        this.standbyRepathTick = -1L;
         interactionTracker.fromEncoded(in.getStringOr(TAG_LIMITER, ""));
         String stateB64 = in.getStringOr(TAG_STATE, "");
         if (!stateB64.isEmpty()) {
@@ -2791,10 +3882,24 @@ public class MonsterGirlEntity extends PathfinderMob
             this.nestPos = null;
         }
         this.rageWithoutNest = in.getBooleanOr(TAG_RAGE_WITHOUT_NEST, true);
-        // 伪装形态持久化（无伪装习性的物种一律人形；伙伴的"猫形陪睡"也属于该形态）
-        boolean loadedCat = in.getBooleanOr(TAG_CAT_FORM, false)
-                && com.linguauniversalis.core.behavior.DisguiseRules.hasDisguise(profile());
-        this.getEntityData().set(DATA_CAT_FORM, loadedCat);
+        // 变形形态持久化：优先读形态 id；旧档只有布尔"猫形"标记 → 折算成该物种登记的形态
+        String loadedForm = in.getStringOr(TAG_DISGUISE_FORM, "");
+        if (loadedForm.isEmpty() && in.getBooleanOr(TAG_CAT_FORM, false)) {
+            com.linguauniversalis.core.species.DisguiseForm legacy =
+                    com.linguauniversalis.core.behavior.DisguiseRules.formOf(profile());
+            loadedForm = legacy == null ? "" : legacy.id();
+        }
+        if (!loadedForm.isEmpty() && !com.linguauniversalis.core.species.DisguiseRegistry.contains(loadedForm)) {
+            loadedForm = "";
+        }
+        this.getEntityData().set(DATA_DISGUISE_FORM, loadedForm);
+        this.combatMode = com.linguauniversalis.core.behavior.CombatModeRules.CombatMode.byId(
+                in.getStringOr(TAG_COMBAT_MODE, com.linguauniversalis.core.behavior.CombatModeRules
+                        .DEFAULT_MODE.id()));
+        this.getEntityData().set(DATA_COMBAT_MODE, combatMode.id());
+        // 调试棒的强制状态（存在则以它为准，随后由 tick 持续保持）
+        this.forcedState = com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState.byId(
+                in.getStringOr(TAG_FORCED_STATE, "normal"));
         this.pendingGift = in.getBooleanOr(TAG_PENDING_GIFT, false);
         this.emeraldGiftArmed = in.getBooleanOr(TAG_EMERALD_GIFT, false);
         this.stolenEmeralds = in.getIntOr(TAG_STOLEN_EMERALDS, 0);

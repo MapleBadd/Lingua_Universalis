@@ -1,7 +1,12 @@
 {
-    "variants":  {
-                     "":  {
-                              "model":  "lingua_universalis:block/scriptorium"
-                          }
-                 }
+  "variants": {
+    "facing=north,has_book=false": { "model": "lingua_universalis:block/scriptorium" },
+    "facing=north,has_book=true":  { "model": "lingua_universalis:block/scriptorium" },
+    "facing=east,has_book=false":  { "model": "lingua_universalis:block/scriptorium" },
+    "facing=east,has_book=true":   { "model": "lingua_universalis:block/scriptorium" },
+    "facing=south,has_book=false": { "model": "lingua_universalis:block/scriptorium" },
+    "facing=south,has_book=true":  { "model": "lingua_universalis:block/scriptorium" },
+    "facing=west,has_book=false":  { "model": "lingua_universalis:block/scriptorium" },
+    "facing=west,has_book=true":   { "model": "lingua_universalis:block/scriptorium" }
+  }
 }

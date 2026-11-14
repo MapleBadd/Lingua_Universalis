@@ -3,31 +3,34 @@
 	"animations": {
 		"display": {
 			"loop": true,
-			"animation_length": 0.0417,
+			"animation_length": 2,
 			"bones": {
 				"cover": {
 					"rotation": {
-						"vector": [0, 70, 0]
+						"vector": [0, 90, 0]
 					}
 				},
 				"backCover": {
 					"rotation": {
-						"vector": [0, -70, 0]
+						"vector": [0, -90, 0]
 					}
 				},
 				"all": {
 					"rotation": {
 						"vector": [0, 90, 0]
+					},
+					"position": {
+						"vector": [0, 0, 4]
 					}
 				},
 				"page1": {
 					"rotation": {
-						"vector": [0, 125, 0]
+						"vector": [0, 172.5, 0]
 					}
 				},
 				"page2": {
 					"rotation": {
-						"vector": [0, 15, 0]
+						"vector": [0, 5, 0]
 					}
 				}
 			}
@@ -42,7 +45,7 @@
 							"vector": [0, 0, 0]
 						},
 						"0.25": {
-							"vector": [0, 70, 0]
+							"vector": [0, 90, 0]
 						}
 					}
 				},
@@ -52,7 +55,7 @@
 							"vector": [0, 0, 0]
 						},
 						"0.25": {
-							"vector": [0, -70, 0]
+							"vector": [0, -90, 0]
 						}
 					}
 				},
@@ -61,19 +64,43 @@
 						"0.0": {
 							"vector": [0, 0, 0]
 						},
+						"0.25": {
+							"vector": [0, 90, 0]
+						}
+					},
+					"position": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
 						"0.0833": {
-							"vector": [0, -90, 0]
+							"vector": [0, 0, 4]
 						}
 					}
 				},
 				"page1": {
 					"rotation": {
-						"vector": [0, 0, 0]
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.1667": {
+							"vector": [0, 0, 0]
+						},
+						"0.25": {
+							"vector": [0, 172.5, 0]
+						}
 					}
 				},
 				"page2": {
 					"rotation": {
-						"vector": [0, 0, 0]
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.1667": {
+							"vector": [0, 0, 0]
+						},
+						"0.25": {
+							"vector": [0, 5, 0]
+						}
 					}
 				}
 			}
@@ -84,17 +111,20 @@
 			"bones": {
 				"cover": {
 					"rotation": {
-						"vector": [0, 70, 0]
+						"vector": [0, 90, 0]
 					}
 				},
 				"backCover": {
 					"rotation": {
-						"vector": [0, -70, 0]
+						"vector": [0, -90, 0]
 					}
 				},
 				"all": {
 					"rotation": {
-						"vector": [0, -90, 0]
+						"vector": [0, 90, 0]
+					},
+					"position": {
+						"vector": [0, 0, 4]
 					}
 				},
 				"page1": {

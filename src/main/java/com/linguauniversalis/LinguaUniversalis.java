@@ -68,6 +68,20 @@ public final class LinguaUniversalis {
         NeoForge.EVENT_BUS.addListener(GirlFilumProtectionHandler::onInvulCheck);
         // 游戏总线：自然生成（原版自然刷猫 → 按物种变量转换为该物种的野生个体）
         NeoForge.EVENT_BUS.addListener(GirlNaturalSpawnHandler::onEntityJoinLevel);
+        // 图鉴持久化：进服读回、退服/关服/每 30 秒写盘
+        // 分类学数据包加载器（data/<ns>/taxonomy/<family>/*.json）
+        NeoForge.EVENT_BUS.addListener(com.linguauniversalis.event.TaxonomyDataLoader::onAddReloadListeners);
+        // 物种档案数据包加载器（data/<ns>/species/*.json）
+        NeoForge.EVENT_BUS.addListener(com.linguauniversalis.event.SpeciesDataLoader::onAddReloadListeners);
+        // 数据包物种的自然生成器
+        NeoForge.EVENT_BUS.addListener(com.linguauniversalis.event.SpeciesSpawnHandler::onServerTick);
+        // 图鉴存储：服务器启动时按**当前存档**读入，关服写回
+        NeoForge.EVENT_BUS.addListener(com.linguauniversalis.event.CodexPersistenceHandler::onServerStarted);
+        NeoForge.EVENT_BUS.addListener(com.linguauniversalis.event.CodexPersistenceHandler::onPlayerLoggedIn);
+        NeoForge.EVENT_BUS.addListener(com.linguauniversalis.event.CodexPersistenceHandler::onPlayerLoggedOut);
+        NeoForge.EVENT_BUS.addListener(com.linguauniversalis.event.CodexPersistenceHandler::onPlayerClone);
+        NeoForge.EVENT_BUS.addListener(com.linguauniversalis.event.CodexPersistenceHandler::onServerTick);
+        NeoForge.EVENT_BUS.addListener(com.linguauniversalis.event.CodexPersistenceHandler::onServerStopping);
 
         LOGGER.info("[Lingua Universalis] loaded. Species: {}", SpeciesRegistry.all().size());
     }

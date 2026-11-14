@@ -43,15 +43,16 @@ public class FirstDraftItem extends Item implements GeoItem {
     }
 
     /**
-     * 动画控制器：<b>当前一个都不注册</b>。
+     * 动画控制器：**物品自身不播动画**（手持 / 物品栏 / 掉落一律默认合着姿态）。
      *
-     * <p>没有控制器 ⇒ 模型永远保持默认（合着）姿态，符合"动画暂时不接"的状态。
-     * 以后要接动画时在这里加控制器 + 阶段机即可（参考 {@code MonsterGirlEntity} 的写法）。
+     * <p>书的"翻开 → 摊开展示"动画只在**誊写台上**播：那份动画烘进了合并模型
+     * {@code scriptorium_book.geo.json}（台子 + 书骨骼），由
+     * {@code ScriptoriumBlockEntity} 的控制器驱动（{@code open} 播一遍 → 循环 {@code display}）。
      */
     @Override
     public void registerControllers(
             com.geckolib.animatable.manager.AnimatableManager.ControllerRegistrar controllers) {
-        // 有意留空
+        // 有意留空：物品形态不播动画
     }
 
     /** 客户端渲染器入口（GeckoLib 约定；物品外观由 {@code items/first_draft.json} 声明为 special 模型）。 */

@@ -45,6 +45,10 @@ public final class SpeciesProfile {
     private final Taxonomy.Taxon sectio;
 
     private final SpawnType spawnType;
+    /** 生成地点标签（群系/结构等，如"村庄"、"洞穴"）；时间由昼夜规则另外推导。 */
+    private final java.util.List<String> spawnTags;
+    /** 数据包物种的自然生成规则（null = 不参与自然生成）。 */
+    private final SpawnRule spawnRule;
     /**
      * 【物种变量】巢穴方块 id（如 阿拉克涅：cubile_araneae）。
      * 无巢穴的物种用 {@link #NEST_NONE} 显式声明"无巢穴"；读取一律走 {@link #hasNest()}。
@@ -70,6 +74,8 @@ public final class SpeciesProfile {
     private final java.util.Map<String, Double> templateParams;
     /** 模板开关（同上，布尔覆盖）。 */
     private final java.util.Map<String, Boolean> templateFlags;
+    /** 模板文本（同上，字符串覆盖：资源 id / 形态 id / 粒子 id 这类非数值变量）。 */
+    private final java.util.Map<String, String> templateText;
 
     private SpeciesProfile(Builder b) {
         this.id = b.id;
@@ -82,6 +88,8 @@ public final class SpeciesProfile {
         this.familia = b.familia;
         this.sectio = b.sectio;
         this.spawnType = b.spawnType;
+        this.spawnTags = java.util.List.copyOf(b.spawnTags);
+        this.spawnRule = b.spawnRule;
         this.nestBlockId = b.nestBlockId;
         this.hotbarSlotNames = java.util.List.copyOf(b.hotbarSlotNames);
         this.backpackSize = b.backpackSize;
@@ -97,6 +105,7 @@ public final class SpeciesProfile {
         this.undeadDamageReduction = b.undeadDamageReduction;
         this.templateParams = java.util.Map.copyOf(b.templateParams);
         this.templateFlags = java.util.Map.copyOf(b.templateFlags);
+        this.templateText = java.util.Map.copyOf(b.templateText);
     }
 
     // ------------------------------------------------------------- getters
@@ -144,6 +153,12 @@ public final class SpeciesProfile {
         return v == null ? defaultValue : v;
     }
 
+    /** 读取物种级模板文本（未设置/空串返回 default）。 */
+    public String templateString(String key, String defaultValue) {
+        String v = templateText.get(key);
+        return v == null || v.trim().isEmpty() ? defaultValue : v;
+    }
+
     /** 按"物种覆盖 > 分类学默认 > fallback"解析数值特性（键见 core/behavior/TemplateKeys）。 */
     public double featureNumber(String key, double fallback) {
         Double override = templateParams.get(key);
@@ -181,8 +196,23 @@ public final class SpeciesProfile {
         return new Taxonomy.Taxon[]{domain, kingdom, magicClassis, socialOrdo, familia, sectio};
     }
 
+    /** 六族标签组（分类学的最终形态；图鉴/筛选/模板都读这里）。 */
+    public com.linguauniversalis.core.taxonomy.TaxonomyTagSet tagSet() {
+        return new com.linguauniversalis.core.taxonomy.TaxonomyTagSet(
+                domain, kingdom, magicClassis, socialOrdo, familia, sectio);
+    }
     public Taxonomy.Taxon sectio() {
         return sectio;
+    }
+
+    /** 自然生成规则（null = 不参与自然生成）。 */
+    public SpawnRule spawnRule() {
+        return spawnRule;
+    }
+
+    /** 生成地点标签（群系/结构）。 */
+    public java.util.List<String> spawnTags() {
+        return spawnTags;
     }
 
     public SpawnType spawnType() {
@@ -202,7 +232,7 @@ public final class SpeciesProfile {
      *
      * <p>未声明（null/空）或显式声明"无巢穴"（{@link #NEST_NONE}）均返回 false ——
      * 因此没有巢穴的物种（如猫又）不会误触发任何巢穴逻辑与依赖巢穴的模板效果
-     * （例如外生息门的"巢穴附近增益"）。
+     * （例如外生息的"巢穴附近增益"）。
      */
     public boolean hasNest() {
         return nestBlockId != null && !nestBlockId.isEmpty() && !NEST_NONE.equals(nestBlockId);
@@ -281,6 +311,8 @@ public final class SpeciesProfile {
         private Taxonomy.Taxon familia;
         private Taxonomy.Taxon sectio;
         private SpawnType spawnType = SpawnType.NATURAL;
+        private java.util.List<String> spawnTags = new java.util.ArrayList<>();
+        private SpawnRule spawnRule;
         private String nestBlockId;
         private final java.util.List<String> hotbarSlotNames = new java.util.ArrayList<>();
         private int backpackSize;
@@ -296,6 +328,7 @@ public final class SpeciesProfile {
         private float undeadDamageReduction;
         private final java.util.Map<String, Double> templateParams = new java.util.HashMap<>();
         private final java.util.Map<String, Boolean> templateFlags = new java.util.HashMap<>();
+        private final java.util.Map<String, String> templateText = new java.util.HashMap<>();
 
         private Builder(String id) {
             this.id = id;
@@ -328,6 +361,24 @@ public final class SpeciesProfile {
         /** 设置物种级模板开关（模板默认值的覆盖）。 */
         public Builder templateFlag(String key, boolean value) {
             this.templateFlags.put(key, value);
+            return this;
+        }
+
+        /** 设置物种级模板文本（资源 id / 形态 id / 粒子 id 这类字符串变量）。 */
+        public Builder templateText(String key, String value) {
+            this.templateText.put(key, value);
+            return this;
+        }
+
+        /** 自然生成规则（数据包物种用；代码内置物种一般为 null）。 */
+        public Builder spawnRule(SpawnRule rule) {
+            this.spawnRule = rule;
+            return this;
+        }
+
+        /** 生成地点标签（群系/结构），显示成图鉴里的字块。 */
+        public Builder spawnTags(String... tags) {
+            this.spawnTags = new java.util.ArrayList<>(java.util.List.of(tags));
             return this;
         }
 
@@ -405,7 +456,14 @@ public final class SpeciesProfile {
                     || socialOrdo == null || familia == null || sectio == null) {
                 throw new IllegalStateException("SpeciesProfile '" + id + "' requires full taxonomy.");
             }
-            return new SpeciesProfile(this);
+            // 标签族校验：六个标签必须各自挂在正确的族上（防止复制粘贴串族）
+            SpeciesProfile probe = new SpeciesProfile(this);
+            java.util.List<String> issues = probe.tagSet().validate();
+            if (!issues.isEmpty()) {
+                throw new IllegalStateException("SpeciesProfile '" + id + "' has invalid taxonomy tags: "
+                        + String.join("; ", issues));
+            }
+            return probe;
         }
     }
 }

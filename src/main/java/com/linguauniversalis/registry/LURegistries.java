@@ -76,11 +76,38 @@ public final class LURegistries {
             ITEMS.registerSimpleItem(LUIds.ITEM_PAPER_OF_VOW, p -> p.stacksTo(1));
     public static final DeferredItem<Item> DEBUG_GIRL_REMOVER =
             ITEMS.registerSimpleItem(LUIds.ITEM_DEBUG_REMOVER, p -> p.stacksTo(1));
+    /** 创造模式大好感之实（+10）：贴图沿用"好感之实"，另加附魔光效。 */
     public static final DeferredItem<Item> DEBUG_AFFECTION =
-            ITEMS.registerSimpleItem(LUIds.ITEM_DEBUG_AFFECTION, p -> p.stacksTo(64));
+            ITEMS.registerSimpleItem(LUIds.ITEM_DEBUG_AFFECTION,
+                    p -> p.stacksTo(64)
+                            .component(net.minecraft.core.component.DataComponents.ENCHANTMENT_GLINT_OVERRIDE, true));
     /** 调试：好感 +1 道具（细粒度调整用）。 */
     public static final DeferredItem<Item> DEBUG_AFFECTION_1 =
             ITEMS.registerSimpleItem(LUIds.ITEM_DEBUG_AFFECTION_1, p -> p.stacksTo(64));
+    /** 调试：饥馑之实（右键魔物娘 -2 饱食度）。 */
+    public static final DeferredItem<Item> DEBUG_FAMINE_FRUIT =
+            ITEMS.registerSimpleItem(LUIds.ITEM_DEBUG_FAMINE_FRUIT, p -> p.stacksTo(64));
+    /** 调试：饱和之实（右键魔物娘 +2 饱食度）。 */
+    public static final DeferredItem<Item> DEBUG_SATIETY_FRUIT =
+            ITEMS.registerSimpleItem(LUIds.ITEM_DEBUG_SATIETY_FRUIT, p -> p.stacksTo(64));
+
+    /** 状态切换棒（调试）：右键魔物娘循环 正常 / 休眠 / 战败，强制状态一直保持；贴图用原版木棍 + 附魔光效。 */
+    public static final DeferredItem<Item> DEBUG_STATE_STICK =
+            ITEMS.registerSimpleItem(LUIds.ITEM_DEBUG_STATE_STICK,
+                    p -> p.stacksTo(1)
+                            .component(net.minecraft.core.component.DataComponents.ENCHANTMENT_GLINT_OVERRIDE, true));
+
+    /** 创造模式负好感之实（右键魔物娘 -1 好感，最低 0）。 */
+    public static final DeferredItem<Item> DEBUG_NEGATIVE_AFFECTION =
+            ITEMS.registerSimpleItem(LUIds.ITEM_DEBUG_NEGATIVE_AFFECTION, p -> p.stacksTo(64));
+    /** 创造模式大负好感之实（右键魔物娘 -10 好感，最低 0）：贴图沿用"负好感之实"，另加附魔光效。 */
+    public static final DeferredItem<Item> DEBUG_BIG_NEGATIVE_AFFECTION =
+            ITEMS.registerSimpleItem(LUIds.ITEM_DEBUG_BIG_NEGATIVE_AFFECTION,
+                    p -> p.stacksTo(64).component(net.minecraft.core.component.DataComponents.ENCHANTMENT_GLINT_OVERRIDE, true));
+
+    /** 哨子：右键切换玩家 32 格内所有魔物娘的被动/主动战斗模式。 */
+    public static final DeferredItem<com.linguauniversalis.item.WhistleItem> WHISTLE =
+            ITEMS.registerItem(LUIds.ITEM_WHISTLE, com.linguauniversalis.item.WhistleItem::new, p -> p.stacksTo(1));
 
     // ------------------------------------------------------------------ 刷怪蛋（生物）
     public static final DeferredItem<SpawnEggItem> ARAKNE_SPAWN_EGG =
@@ -89,12 +116,29 @@ public final class LURegistries {
     public static final DeferredItem<SpawnEggItem> NEKOMATA_SPAWN_EGG =
             ITEMS.registerItem(LUIds.ITEM_NEKOMATA_SPAWN_EGG, SpawnEggItem::new,
                     p -> p.spawnEgg(LUEntities.NEKOMATA.get()));
+    /** 通用刷怪蛋（生成 {@code monster_girl} 通用实体；物种可在生成后由档案决定）。 */
+    public static final DeferredItem<SpawnEggItem> MONSTER_GIRL_SPAWN_EGG =
+            ITEMS.registerItem(LUIds.ITEM_MONSTER_GIRL_SPAWN_EGG, SpawnEggItem::new,
+                    p -> p.spawnEgg(LUEntities.MONSTER_GIRL.get()));
 
     // ------------------------------------------------------------------ 方块（占位）
-    public static final DeferredBlock<Block> SCRIPTORIUM =
-            BLOCKS.registerSimpleBlock(LUIds.BLOCK_SCRIPTORIUM);
-    public static final DeferredItem<BlockItem> SCRIPTORIUM_ITEM =
-            ITEMS.registerSimpleBlockItem(LUIds.BLOCK_SCRIPTORIUM, SCRIPTORIUM);
+    /**
+     * 誊写台：GeckoLib 渲染的方块（美术 {@code 誊写台.geo.json}），物品栏用同一份 geo 模型
+     * （{@code items/scriptorium.json} 声明为 {@code minecraft:special} + {@code geckolib}）。
+     * "台面上有没有初稿"是方块状态 {@code has_book}。
+     */
+    public static final DeferredBlock<com.linguauniversalis.block.ScriptoriumBlock> SCRIPTORIUM =
+            BLOCKS.registerBlock(LUIds.BLOCK_SCRIPTORIUM,
+                    com.linguauniversalis.block.ScriptoriumBlock::new,
+                    // 与**讲台**一致：硬度 2.5、木质音效（斧类挖掘，见 tags/block/mineable/axe）
+            p -> p.strength(2.5F).sound(net.minecraft.world.level.block.SoundType.WOOD).noOcclusion());
+    public static final DeferredItem<com.linguauniversalis.item.ScriptoriumItem> SCRIPTORIUM_ITEM =
+            ITEMS.registerItem(LUIds.BLOCK_SCRIPTORIUM,
+                    props -> new com.linguauniversalis.item.ScriptoriumItem(SCRIPTORIUM.get(), props),
+                    p -> p.useBlockDescriptionPrefix());
+    public static final DeferredHolder<BlockEntityType<?>,
+            BlockEntityType<com.linguauniversalis.block.ScriptoriumBlockEntity>> SCRIPTORIUM_BE =
+            BLOCK_ENTITY_TYPES.register(LUIds.BLOCK_ENTITY_SCRIPTORIUM, LURegistries::createScriptoriumType);
 
     /**
      * 伙伴宝箱（54 格共享收纳）：自定义方块 + 方块实体 + 容器界面。
@@ -106,9 +150,17 @@ public final class LURegistries {
     public static final DeferredBlock<com.linguauniversalis.block.CompanionChestBlock> CHEST_OF_COMPANIONS =
             BLOCKS.registerBlock(LUIds.BLOCK_CHEST_OF_COMPANIONS,
                     com.linguauniversalis.block.CompanionChestBlock::new,
-                    p -> p.strength(2.5F).sound(net.minecraft.world.level.block.SoundType.WOOD).noOcclusion());
-    public static final DeferredItem<BlockItem> CHEST_OF_COMPANIONS_ITEM =
-            ITEMS.registerSimpleBlockItem(LUIds.BLOCK_CHEST_OF_COMPANIONS, CHEST_OF_COMPANIONS);
+                    // 与**铜箱子**一致：硬度 3.0、铜质音效、需要石质工具才能掉落
+            p -> p.strength(3.0F)
+                    .sound(net.minecraft.world.level.block.SoundType.COPPER)
+                    .requiresCorrectToolForDrops()
+                    .noOcclusion());
+    /** 伙伴宝箱物品：用 GeckoLib 物品渲染（物品栏里显示宝箱自己的 geo 模型）。 */
+    public static final DeferredItem<com.linguauniversalis.item.CompanionChestItem> CHEST_OF_COMPANIONS_ITEM =
+            ITEMS.registerItem(LUIds.BLOCK_CHEST_OF_COMPANIONS,
+                    props -> new com.linguauniversalis.item.CompanionChestItem(
+                            CHEST_OF_COMPANIONS.get(), props),
+                    p -> p.useBlockDescriptionPrefix());
 
     /** 伙伴宝箱的方块实体（54 格容器）。 */
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<
@@ -118,15 +170,48 @@ public final class LURegistries {
                             (pos, state) -> new com.linguauniversalis.block.CompanionChestBlockEntity(pos, state),
                             java.util.Set.of(CHEST_OF_COMPANIONS.get())));
 
+    /**
+     * 中魔物床（中体型魔物娘睡觉用）。
+     *
+     * <p>直接继承原版 {@code BedBlock}：占两格、朝向、碰撞箱、放置/破坏全部与原版床一致；
+     * 外观复用原版红色床模型（方块状态里直接指向 {@code minecraft:block/red_bed_*}）。
+     */
+    public static final DeferredBlock<com.linguauniversalis.block.MonsterBedBlock> MONSTER_BED =
+            BLOCKS.registerBlock(LUIds.BLOCK_MONSTER_BED,
+                    com.linguauniversalis.block.MonsterBedBlock::new,
+                    p -> p.strength(0.2F).sound(net.minecraft.world.level.block.SoundType.WOOD).noOcclusion());
+    public static final DeferredItem<com.linguauniversalis.item.MonsterBedItem> MONSTER_BED_ITEM =
+            ITEMS.registerItem(LUIds.BLOCK_MONSTER_BED,
+                    props -> new com.linguauniversalis.item.MonsterBedItem(MONSTER_BED.get(), props), p -> p);
+
+    /** 中魔物床的方块实体（GeckoLib 渲染用）。 */
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<
+            com.linguauniversalis.block.MonsterBedBlockEntity>> MONSTER_BED_BE =
+            BLOCK_ENTITY_TYPES.register(LUIds.BLOCK_MONSTER_BED + "_be",
+                    () -> new BlockEntityType<>(
+                            (pos, state) -> new com.linguauniversalis.block.MonsterBedBlockEntity(pos, state),
+                            java.util.Set.of(MONSTER_BED.get())));
+
     public static final DeferredBlock<SpinaFlorensBlock> SPINA_FLORENS =
             BLOCKS.registerBlock(LUIds.BLOCK_SPINA_FLORENS, SpinaFlorensBlock::new,
-                    java.util.function.UnaryOperator.identity());
+            // 虞美人同款手感：瞬间破坏（hardness 0）、无碰撞、花草音效、随机水平偏移
+            p -> p.instabreak()
+                    .noCollision()
+                    .sound(net.minecraft.world.level.block.SoundType.GRASS)
+                    .offsetType(net.minecraft.world.level.block.state.BlockBehaviour.OffsetType.XZ));
     public static final DeferredItem<BlockItem> SPINA_FLORENS_ITEM =
             ITEMS.registerSimpleBlockItem(LUIds.BLOCK_SPINA_FLORENS, SPINA_FLORENS);
 
     /** 绽放之刺方块实体（承载仪式快照 + 接触伤害 tick）。 */
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<SpinaFlorensBlockEntity>> SPINA_FLORENS_BE =
             BLOCK_ENTITY_TYPES.register(LUIds.BLOCK_ENTITY_SPINA_FLORENS, LURegistries::createSpinaType);
+
+    private static BlockEntityType<com.linguauniversalis.block.ScriptoriumBlockEntity> createScriptoriumType() {
+        return new BlockEntityType<>(
+                (pos, state) -> new com.linguauniversalis.block.ScriptoriumBlockEntity(
+                        SCRIPTORIUM_BE.get(), pos, state),
+                java.util.Set.of(SCRIPTORIUM.get()));
+    }
 
     private static BlockEntityType<SpinaFlorensBlockEntity> createSpinaType() {
         return new BlockEntityType<>(
@@ -179,6 +264,12 @@ public final class LURegistries {
                     () -> net.neoforged.neoforge.common.extensions.IMenuTypeExtension.create(
                             com.linguauniversalis.menu.GirlInventoryMenu::fromNetwork));
 
+    /** 图鉴界面菜单：携带方块坐标 + 该玩家的解锁掩码表。 */
+    public static final DeferredHolder<net.minecraft.world.inventory.MenuType<?>,
+            net.minecraft.world.inventory.MenuType<com.linguauniversalis.menu.CodexMenu>>
+            CODEX_MENU = MENU_TYPES.register(LUIds.MENU_CODEX,
+                    () -> net.neoforged.neoforge.common.extensions.IMenuTypeExtension.create(
+                            com.linguauniversalis.menu.CodexMenu::fromNetwork));
     /** 伙伴宝箱界面菜单（携带方块坐标，客户端据此取本地方块实体）。 */
     public static final DeferredHolder<net.minecraft.world.inventory.MenuType<?>,
             net.minecraft.world.inventory.MenuType<com.linguauniversalis.menu.CompanionChestMenu>>
@@ -190,7 +281,7 @@ public final class LURegistries {
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> MAIN_TAB =
             CREATIVE_TABS.register("main", () -> CreativeModeTab.builder()
                     .title(Component.translatable("itemGroup.lingua_universalis"))
-                    .icon(() -> FIRST_DRAFT.get().getDefaultInstance())
+                    .icon(() -> WHISTLE.get().getDefaultInstance())
                     .displayItems((parameters, output) -> {
                         output.accept(FIRST_DRAFT.get().getDefaultInstance());
                         output.accept(FATUM_FILUM.get().getDefaultInstance());
@@ -202,11 +293,19 @@ public final class LURegistries {
                         output.accept(DEBUG_GIRL_REMOVER.get().getDefaultInstance());
                         output.accept(DEBUG_AFFECTION.get().getDefaultInstance());
                         output.accept(DEBUG_AFFECTION_1.get().getDefaultInstance());
+                        output.accept(DEBUG_FAMINE_FRUIT.get().getDefaultInstance());
+                        output.accept(DEBUG_SATIETY_FRUIT.get().getDefaultInstance());
+                        output.accept(DEBUG_NEGATIVE_AFFECTION.get().getDefaultInstance());
+                        output.accept(DEBUG_BIG_NEGATIVE_AFFECTION.get().getDefaultInstance());
+                        output.accept(DEBUG_STATE_STICK.get().getDefaultInstance());
+                        output.accept(WHISTLE.get().getDefaultInstance());
                         output.accept(ARAKNE_SPAWN_EGG.get().getDefaultInstance());
                         output.accept(NEKOMATA_SPAWN_EGG.get().getDefaultInstance());
+                        output.accept(MONSTER_GIRL_SPAWN_EGG.get().getDefaultInstance());
                         output.accept(SCRIPTORIUM_ITEM.get().getDefaultInstance());
                         output.accept(CHEST_OF_COMPANIONS_ITEM.get().getDefaultInstance());
                         output.accept(SPINA_FLORENS_ITEM.get().getDefaultInstance());
+                        output.accept(MONSTER_BED_ITEM.get().getDefaultInstance());
                         output.accept(CUBILE_ARANEAE_ITEM.get().getDefaultInstance());
                     })
                     .build());

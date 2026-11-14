@@ -33,7 +33,7 @@ public final class GirlDamageHandler {
             event.setAmount(0f);
             return;
         }
-        // 弹射物闪避（绒科）：判定按<b>原版弹射物伤害类型标签</b>——
+        // 弹射物闪避（绒）：判定按<b>原版弹射物伤害类型标签</b>——
         // 本模组的魔法弹道（暗影箭）使用魔法伤害类型，不属于弹射物，因此不触发闪避、
         // 也不受弹射物保护附魔影响；原版箭/雪球等仍会触发闪避。
         if (girl.level() instanceof ServerLevel srvLevel
@@ -81,7 +81,38 @@ public final class GirlDamageHandler {
             if (girl.isInWater()) {
                 girl.setNoGravity(true); // 浮于水面
             }
+            notifyOwnerKnockdown(girl, st);
             // TODO: 26.2 火焰清理 API 待查；锁血期间火焰伤害已被拦截
         }
+    }
+
+    /**
+     * 伙伴被击倒 → 在聊天栏播报给她的绑定玩家。
+     *
+     * <p>只在"她是某个玩家的伙伴/友善个体"时播报（野生个体不会倒地，这条基本不会触发）；
+     * 用翻译键，中英文都走语言文件：{@code death.lingua_universalis.knockdown}。
+     */
+    private static void notifyOwnerKnockdown(com.linguauniversalis.entity.MonsterGirlEntity girl,
+                                             com.linguauniversalis.core.state.MonsterGirlState state) {
+        String ownerUuid = state.boundPlayerUuid();
+        if (ownerUuid == null || ownerUuid.isEmpty()) {
+            return;
+        }
+        if (!(girl.level() instanceof net.minecraft.server.level.ServerLevel serverLevel)) {
+            return;
+        }
+        net.minecraft.server.level.ServerPlayer owner;
+        try {
+            owner = serverLevel.getServer().getPlayerList().getPlayer(java.util.UUID.fromString(ownerUuid));
+        } catch (IllegalArgumentException malformed) {
+            return;
+        }
+        if (owner == null) {
+            return; // 主人不在线：不播报（上线后可从状态牌看到）
+        }
+        int seconds = com.linguauniversalis.core.behavior.StatusPlateRules.secondsFromTicks(
+                state.downedLockTicks());
+        owner.sendSystemMessage(net.minecraft.network.chat.Component.translatable(
+                "death.lingua_universalis.knockdown", girl.getDisplayName(), seconds));
     }
 }

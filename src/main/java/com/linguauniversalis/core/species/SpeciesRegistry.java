@@ -22,6 +22,16 @@ public final class SpeciesRegistry {
         REGISTRY.put(profile.id(), profile);
     }
 
+    /** 移除一个物种（数据包重载时清理上一次注册的条目用）。 */
+    public static boolean remove(String id) {
+        return REGISTRY.remove(id) != null;
+    }
+
+    /** 注册或覆盖（数据包用：同 id 文件覆盖内置档案）。 */
+    public static void registerOrReplace(SpeciesProfile profile) {
+        REGISTRY.put(profile.id(), profile);
+    }
+
     public static SpeciesProfile get(String id) {
         SpeciesProfile profile = REGISTRY.get(id);
         if (profile == null) {

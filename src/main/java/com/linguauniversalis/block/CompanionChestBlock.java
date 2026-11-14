@@ -1,56 +1,71 @@
 package com.linguauniversalis.block;
 
-import com.linguauniversalis.menu.CompanionChestMenu;
 import com.linguauniversalis.registry.LURegistries;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.network.chat.Component;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.EntityBlock;
-import net.minecraft.world.level.block.HorizontalDirectionalBlock;
+import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.StateDefinition;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.SimpleMenuProvider;
-import net.minecraft.server.level.ServerPlayer;
 
 /**
- * 伙伴宝箱（54 格共享收纳，设计 §6）——**模型暂时用原版末影箱代替**（资源里 parent 到
- * {@code minecraft:block/ender_chest}），方块行为与普通箱子一致：右键打开容器界面。
+ * 伙伴宝箱方块：**直接继承原版 {@link ChestBlock}**（54 格共用收纳）。
  *
- * <p>"不能合成大箱子"是天然的：这是本模组自己的方块，不存在原版双箱合并逻辑。
+ * <p>继承原版拿到的正是之前自己实现时踩坑的部分：
+ * <ul>
+ *   <li>碰撞箱整格、选中框 14/16 —— 与原版箱子**逐项一致**，AI 寻路不会把它当成"可跨越的矮障碍"；</li>
+ *   <li>上方被实心方块遮挡时打不开；</li>
+ *   <li>开箱/关箱音效（这里用**铜箱子**音色）、开合计数同步；</li>
+ *   <li>双箱合并判定（本方块永远是单体：{@code type} 只有 SINGLE）。</li>
+ * </ul>
+ *
+ * <p>只覆盖三处：外观交给 GeckoLib（{@link RenderShape#INVISIBLE} + 方块实体渲染器）、
+ * 方块实体类型、以及"猫又坐在上面时不许打开"这条本模组规则。
  */
-public class CompanionChestBlock extends HorizontalDirectionalBlock implements EntityBlock {
-    public static final EnumProperty<Direction> FACING = BlockStateProperties.HORIZONTAL_FACING;
+public class CompanionChestBlock extends ChestBlock {
     /** 方块编解码器（26.2 的方块必须有 codec）。 */
     public static final com.mojang.serialization.MapCodec<CompanionChestBlock> CODEC =
             simpleCodec(CompanionChestBlock::new);
 
+    /** 是否有人开着（渲染镜像：开合动画读它，方块状态会同步到客户端）。 */
+    public static final net.minecraft.world.level.block.state.properties.BooleanProperty OPEN =
+            net.minecraft.world.level.block.state.properties.BooleanProperty.create("open");
+
     public CompanionChestBlock(Properties properties) {
-        super(properties);
-        registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH));
+        // 原版构造接管开合音效：用铜箱子的开/关音色
+        super(() -> LURegistries.COMPANION_CHEST_BE.get(),
+                SoundEvents.COPPER_CHEST_OPEN, SoundEvents.COPPER_CHEST_CLOSE, properties);
+        registerDefaultState(defaultBlockState().setValue(OPEN, false));
     }
 
     @Override
-    protected com.mojang.serialization.MapCodec<? extends HorizontalDirectionalBlock> codec() {
-        return CODEC;
+    protected void createBlockStateDefinition(
+            net.minecraft.world.level.block.state.StateDefinition.Builder<net.minecraft.world.level.block.Block,
+                    BlockState> builder) {
+        super.createBlockStateDefinition(builder);
+        builder.add(OPEN);
     }
 
     @Override
-    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(FACING);
+    public BlockState getStateForPlacement(net.minecraft.world.item.context.BlockPlaceContext context) {
+        BlockState state = super.getStateForPlacement(context);
+        return state == null ? null : state.setValue(OPEN, false);
     }
 
     @Override
-    public BlockState getStateForPlacement(BlockPlaceContext context) {
-        return defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
+    public com.mojang.serialization.MapCodec<? extends ChestBlock> codec() {
+        // 与父类同款（方块本身没有额外序列化字段）
+        return ChestBlock.CODEC;
+    }
+
+    /** 外观由 GeckoLib 渲染器绘制。 */
+    @Override
+    protected RenderShape getRenderShape(BlockState state) {
+        return RenderShape.INVISIBLE;
     }
 
     @Override
@@ -58,33 +73,44 @@ public class CompanionChestBlock extends HorizontalDirectionalBlock implements E
         return new CompanionChestBlockEntity(pos, state);
     }
 
-    /** 右键打开容器界面（空手右键即可，与箱子一致）。 */
+    /**
+     * 打开箱子：原版逻辑（含"上方被遮挡则打不开"）之外，多一条本模组规则 ——
+     * **猫又坐在箱子上时不许打开**（放一个"锁住"的声音提示）。
+     */
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player,
             BlockHitResult hitResult) {
-        if (level.isClientSide()) {
+        if (isSatOnByNekomata(level, pos)) {
+            if (!level.isClientSide()) {
+                level.playSound(null, pos, SoundEvents.CHEST_LOCKED,
+                        net.minecraft.sounds.SoundSource.BLOCKS, 0.8F, 1.0F);
+            }
             return InteractionResult.SUCCESS;
         }
-        if (!(player instanceof ServerPlayer serverPlayer)) {
-            return InteractionResult.SUCCESS;
-        }
-        if (level.getBlockEntity(pos) instanceof CompanionChestBlockEntity chest) {
-            serverPlayer.openMenu(new SimpleMenuProvider(
-                            (containerId, inventory, ignored) -> new CompanionChestMenu(
-                                    containerId, inventory, chest, pos),
-                            Component.translatable("block.lingua_universalis.chest_of_companions")),
-                    buffer -> buffer.writeBlockPos(pos));
-        }
-        return InteractionResult.SUCCESS;
+        return super.useWithoutItem(state, level, pos, player, hitResult);
     }
 
-    /** 掉落物：箱子被破坏时把里面的东西撒出来（与原版箱子一致）。 */
+    /** 破坏方块时把内容物撒出来（与原版箱子一致）。 */
     @Override
     public BlockState playerWillDestroy(Level level, BlockPos pos, BlockState state, Player player) {
         if (!level.isClientSide() && level.getBlockEntity(pos) instanceof CompanionChestBlockEntity chest) {
             chest.dropContents();
         }
         return super.playerWillDestroy(level, pos, state, player);
+    }
+
+    /** 是否有一只猫又正坐在箱子正上方。 */
+    private static boolean isSatOnByNekomata(Level level, BlockPos pos) {
+        net.minecraft.world.phys.AABB top = new net.minecraft.world.phys.AABB(
+                pos.getX(), pos.getY() + 0.9D, pos.getZ(),
+                pos.getX() + 1.0D, pos.getY() + 2.2D, pos.getZ() + 1.0D);
+        for (com.linguauniversalis.entity.MonsterGirlEntity girl
+                : level.getEntitiesOfClass(com.linguauniversalis.entity.MonsterGirlEntity.class, top)) {
+            if ("nekomata".equals(girl.speciesId())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** 供 {@code LURegistries} 构造方块实体类型时引用。 */

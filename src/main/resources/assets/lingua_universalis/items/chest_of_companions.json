@@ -3,8 +3,7 @@
     "type": "minecraft:special",
     "base": "lingua_universalis:item/chest_of_companions",
     "model": {
-      "type": "minecraft:chest",
-      "texture": "minecraft:ender"
+      "type": "geckolib:geckolib"
     }
   }
 }

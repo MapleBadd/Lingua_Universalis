@@ -31,6 +31,7 @@ public final class GirlDeathHandler {
             return;
         }
         if (victim instanceof MonsterGirlEntity girl) {
+            com.linguauniversalis.core.companion.CompanionRegistry.removeByEntity(girl.getStringUUID());
             dropGirlInventory(girl);
             dropFilum(server, girl);
             return;

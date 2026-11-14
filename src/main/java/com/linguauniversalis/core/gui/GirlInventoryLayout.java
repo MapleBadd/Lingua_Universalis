@@ -6,108 +6,105 @@ import com.linguauniversalis.core.species.SpeciesProfile;
 /**
  * 魔物娘 GUI（快捷栏 + 背包）的容器布局（纯计算，无 MC 依赖；可冒烟测试）。
  *
- * <p>面板宽固定 176（与原版容器一致），高随背包行数增长：
+ * <p>坐标全部来自美术图 {@code textures/gui/girl_inventory.png}（176×220，逐像素量过）：
  * <pre>
- *   ┌ 标题
- *   ├ 快捷栏 标签 + 一格（槽位居中：2 格 = 主手/副手，4 格 = 阿拉克涅主副手+附肢1/2）
- *   ├ 背包 标签 + 每行最多 9 格
- *   ├ 玩家背包 标签 + 3 行 + 快捷栏行（原版 addStandardInventorySlots 的口径）
- *   └ 底边
+ *   快捷栏     9 格：物品 y=35，格子左上 (7,34)，横向排布、**从左往右**依次是
+ *              主手 / 副手 / 附肢1 / 附肢2 …（物种档案声明的槽位），其余格子显示"锁定"图标
+ *   背包      3 行 × 9 格：物品 y=71 / 89 / 107
+ *   玩家背包  3 行：物品 y=139 / 157 / 175
+ *   玩家快捷栏 1 行：物品 y=197
  * </pre>
  *
- * <p>槽位坐标是**物品位置**；槽位底图（原版 18×18 槽位贴图）画在 {@code (x-1, y-1)}。
+ * <p>槽位间距 18（16 像素格 + 1 像素边框）；物品坐标 = 格子左上 + 1。
  */
 public final class GirlInventoryLayout {
     private GirlInventoryLayout() {
     }
 
-    /** 面板宽度（原版容器口径）。 */
+    /** 面板尺寸（与美术图一致）。 */
     public static final int PANEL_WIDTH = 176;
-    /** 槽位间距 / 槽位底图尺寸。 */
+    public static final int PANEL_HEIGHT = 220;
+    /** 槽位间距。 */
     public static final int SLOT_SIZE = 18;
-    /** 每行最多槽位数（背包）。 */
+    /** 每行槽位数。 */
     public static final int SLOTS_PER_ROW = 9;
+    /** 快捷栏最大格数（美术图第一行固定 9 格）。 */
+    public static final int MAX_HOTBAR_SLOTS = 9;
 
-    /** 标签左边距。 */
-    public static final int LABEL_X = 8;
-    /** 标题 y（原版默认 6）。 */
+    /** 格子左上角 x（第一列）。 */
+    public static final int SLOT_CELL_X = 7;
+    /** 快捷栏格子左上角 y。 */
+    public static final int HOTBAR_CELL_Y = 34;
+    /** 背包第一行格子左上角 y。 */
+    public static final int BACKPACK_CELL_Y = 70;
+
+    /** 物品位置相对格子的偏移（边框 1 像素）。 */
+    private static final int ITEM_OFFSET = 1;
+
+    /** 标题 y。 */
     public static final int TITLE_Y = 6;
-    /** 「快捷栏」标签 y。 */
-    public static final int HOTBAR_LABEL_Y = 18;
-    /** 快捷栏那一行的槽位 y。 */
-    public static final int HOTBAR_Y = 30;
-    /** 「背包」标签 y。 */
-    public static final int BACKPACK_LABEL_Y = 52;
-    /** 背包第一行槽位 y。 */
-    public static final int BACKPACK_Y = 64;
-    /** 背包最后一行与「玩家背包」标签之间的间距。 */
-    public static final int PLAYER_LABEL_GAP = 14;
-    /** 标签与首行槽位的间距（原版 12）。 */
-    public static final int LABEL_TO_SLOT = 12;
     /** 玩家背包区左边距（原版口径）。 */
     public static final int PLAYER_INV_X = 8;
-    /** 玩家背包区高度：3 行 + 4 间隔 + 快捷栏行（原版 addStandardInventorySlots 口径）。 */
-    public static final int PLAYER_INV_BLOCK_HEIGHT = 3 * SLOT_SIZE + 4 + SLOT_SIZE;
-    /** 面板底部留白。 */
-    public static final int BOTTOM_MARGIN = 8;
+    /** 玩家背包首行物品 y。 */
+    public static final int PLAYER_INV_Y = 139;
+    /** 玩家背包标签 y。 */
+    public static final int PLAYER_INV_LABEL_Y = 129;
 
-    /** 面板顶部原尺寸片段高度（含标题区与圆角上边框）。 */
-    public static final int PANEL_TOP_HEIGHT = 18;
-    /** 面板底部原尺寸片段高度（含下边框与投影）。 */
-    public static final int PANEL_BOTTOM_HEIGHT = 7;
+    /** 「快捷栏」标签 y。 */
+    public static final int HOTBAR_LABEL_Y = 20;
+    /** 「背包」标签 y。 */
+    public static final int BACKPACK_LABEL_Y = 56;
+    /** 标签左边距。 */
+    public static final int LABEL_X = 8;
 
-    /** 背包行数（0 格 = 0 行）。 */
+    /** 背包行数（按实际格数向上取整，最多 3 行）。 */
     public static int backpackRows(int backpackSlots) {
-        if (backpackSlots <= 0) {
-            return 0;
-        }
-        return (backpackSlots + SLOTS_PER_ROW - 1) / SLOTS_PER_ROW;
+        return Math.max(0, Math.min(3, (backpackSlots + SLOTS_PER_ROW - 1) / SLOTS_PER_ROW));
     }
 
-    /** 背包某一行的格数（最后一行可能不满）。 */
-    public static int countInRow(int backpackSlots, int row) {
-        return Math.max(0, Math.min(SLOTS_PER_ROW, backpackSlots - row * SLOTS_PER_ROW));
+    /** 快捷栏格子左上角 x（第 index 格）。 */
+    public static int hotbarCellX(int index) {
+        return SLOT_CELL_X + index * SLOT_SIZE;
     }
 
-    /** 一行 countInRow 个槽位居中时的起始 x。 */
-    private static int rowStartX(int countInRow) {
-        return (PANEL_WIDTH - countInRow * SLOT_SIZE) / 2;
+    /** 快捷栏格子左上角 y。 */
+    public static int hotbarCellY() {
+        return HOTBAR_CELL_Y;
     }
 
-    /** 快捷栏第 index 个槽位 x（整行居中）。 */
-    public static int hotbarSlotX(int hotbarSlots, int index) {
-        return rowStartX(hotbarSlots) + index * SLOT_SIZE;
+    /** 背包格子左上角 x / y（index 相对背包首格）。 */
+    public static int backpackCellX(int index) {
+        return SLOT_CELL_X + (index % SLOTS_PER_ROW) * SLOT_SIZE;
     }
 
-    /** 快捷栏第 index 个槽位 y。 */
+    public static int backpackCellY(int index) {
+        return BACKPACK_CELL_Y + (index / SLOTS_PER_ROW) * SLOT_SIZE;
+    }
+
+    /** 快捷栏第 index 个**真实槽位**的物品 x / y（左侧对齐，从左往右排）。 */
+    public static int hotbarSlotX(int index) {
+        return hotbarCellX(index) + ITEM_OFFSET;
+    }
+
     public static int hotbarSlotY(int index) {
-        return HOTBAR_Y;
+        return hotbarCellY() + ITEM_OFFSET;
     }
 
-    /** 背包第 index 个槽位所在的背包行（0 起）。 */
-    public static int backpackRow(int index) {
-        return index / SLOTS_PER_ROW;
+    /** 背包第 index 个**真实槽位**的物品 x / y。 */
+    public static int backpackSlotX(int index) {
+        return backpackCellX(index) + ITEM_OFFSET;
     }
 
-    /** 背包第 index 个槽位 x（按所在行居中）。 */
-    public static int backpackSlotX(int backpackSlots, int index) {
-        int row = backpackRow(index);
-        return rowStartX(countInRow(backpackSlots, row)) + (index % SLOTS_PER_ROW) * SLOT_SIZE;
-    }
-
-    /** 背包第 index 个槽位 y。 */
     public static int backpackSlotY(int index) {
-        return BACKPACK_Y + backpackRow(index) * SLOT_SIZE;
+        return backpackCellY(index) + ITEM_OFFSET;
     }
 
-    // ------------------------------------------------------------ 按档案的便捷重载
     /** 容器第 index 个槽位 x（快捷栏/背包自动分派）。 */
     public static int girlSlotX(SpeciesProfile profile, int index) {
         if (InventoryRules.isHotbarSlot(profile, index)) {
-            return hotbarSlotX(InventoryRules.hotbarSlots(profile), index);
+            return hotbarSlotX(index);
         }
-        return backpackSlotX(InventoryRules.backpackSlots(profile),
-                index - InventoryRules.hotbarSlots(profile));
+        return backpackSlotX(index - InventoryRules.hotbarSlots(profile));
     }
 
     /** 容器第 index 个槽位 y（快捷栏/背包自动分派）。 */
@@ -118,23 +115,18 @@ public final class GirlInventoryLayout {
         return backpackSlotY(index - InventoryRules.hotbarSlots(profile));
     }
 
-    /** 「玩家背包」标签 y。 */
-    public static int playerInventoryLabelY(int backpackSlots) {
-        return BACKPACK_Y + backpackRows(backpackSlots) * SLOT_SIZE + PLAYER_LABEL_GAP;
-    }
-
-    /** 玩家背包首行槽位 y。 */
-    public static int playerInventoryY(int backpackSlots) {
-        return playerInventoryLabelY(backpackSlots) + LABEL_TO_SLOT;
-    }
-
-    /** 面板总高。 */
+    /** 面板总高（固定，与美术图一致）。 */
     public static int imageHeight(int backpackSlots) {
-        return playerInventoryY(backpackSlots) + PLAYER_INV_BLOCK_HEIGHT + BOTTOM_MARGIN;
+        return PANEL_HEIGHT;
     }
 
-    /** 面板中段（纵向拉伸填充）的高度：总高 - 顶部片段 - 底部片段。 */
-    public static int panelMiddleHeight(int imageHeight) {
-        return Math.max(0, imageHeight - PANEL_TOP_HEIGHT - PANEL_BOTTOM_HEIGHT);
+    /** 玩家背包标签 y（固定）。 */
+    public static int playerInventoryLabelY(int backpackSlots) {
+        return PLAYER_INV_LABEL_Y;
+    }
+
+    /** 玩家背包首行物品 y（固定）。 */
+    public static int playerInventoryY(int backpackSlots) {
+        return PLAYER_INV_Y;
     }
 }

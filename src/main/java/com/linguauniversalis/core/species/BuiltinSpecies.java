@@ -16,15 +16,17 @@ public final class BuiltinSpecies {
 
     /** 需要在注册任何实体之前调用（模组 common setup）。 */
     public static void registerAll() {
+        // 变形形态先登记（物种档案会按 id 引用：species.disguiseForm）
+        DisguiseRegistry.registerDefaults();
         registerArakne();
         registerNekomata();
     }
 
     /**
-     * 阿拉克涅 arakne —— 物质域/外壳界/外生息门/领地巡游纲/规序目/触肢科。
+     * 阿拉克涅 arakne —— 物质/外壳/外生息/领地巡游/规序/触肢。
      * 固定刷新型，绑定巢穴方块（蜘蛛巢心）；快捷栏：主手/副手/附肢1/附肢2 + 背包 9。
      *
-     * <p>社会习性使用「领地巡游纲」模板（{@link com.linguauniversalis.core.behavior.OrdoTemplates#TERRITORIALIS}），
+     * <p>社会习性使用「领地巡游」模板（{@link com.linguauniversalis.core.behavior.OrdoTemplates#TERRITORIALIS}），
      * 并显式给出自己的领地/威胁数值（与模板默认一致，显式写出以示范"档案覆盖模板参数"）。
      */
     private static void registerArakne() {
@@ -34,9 +36,16 @@ public final class BuiltinSpecies {
                         Taxonomy.MagicClassis.EXOSPIRA, Taxonomy.SocialOrdo.TERRITORIALIS,
                         Taxonomy.ElementFamilia.ORDO, Taxonomy.FormaSectio.PALPI)
                 .nestBlock("cubile_araneae") // 【物种变量】巢穴方块 = 蜘蛛巢心
+                .spawnTags("洞穴")           // 图鉴"生成方式"里的地点字块
+                // 自然生成：偏好低光（洞穴/夜晚），任何群系都可能
+                .spawnRule(new com.linguauniversalis.core.species.SpawnRule(
+                        java.util.List.of(), 8, 1, 5, 120, 7))
                 .hotbar("main_hand", "off_hand", "appendage1", "appendage2")
                 .backpack(9)
-                // 领地巡游纲模板参数（物种数值覆盖模板默认值）
+                // 图鉴里暂时隐藏（美术未完成）：物种本身仍正常生成/交互
+                .templateFlag(com.linguauniversalis.core.behavior.TemplateKeys.FLAG_SPECIES_HIDE_IN_CODEX,
+                        true)
+                // 领地巡游模板参数（物种数值覆盖模板默认值）
                 .templateParam(com.linguauniversalis.core.behavior.OrdoTemplates.KEY_TERRITORY_HORIZONTAL, 24.0)
                 .templateParam(com.linguauniversalis.core.behavior.OrdoTemplates.KEY_THREAT_RADIUS, 12.0)
                 // 同种族敌意·物种变量（阿拉克涅习性别）：巢穴威胁半径内攻击同种族 = true；
@@ -56,9 +65,14 @@ public final class BuiltinSpecies {
                 .templateParam(com.linguauniversalis.core.behavior.TemplateKeys.ABILITY_SILK_RANGE, 12.0)
                 .templateParam(com.linguauniversalis.core.behavior.TemplateKeys.ABILITY_POISON_TICKS, 160.0)
                 .templateParam(com.linguauniversalis.core.behavior.TemplateKeys.ABILITY_POISON_AMPLIFIER, 1.0)
+                // 睡眠习性：夜行性（白天睡；有巢穴 → 在巢心 3 格内就地睡）
+                .templateFlag(com.linguauniversalis.core.behavior.TemplateKeys.FLAG_SPECIES_NOCTURNAL, true)
+                // 体型：大（对应未来会有的"大魔物床"）
+                .templateParam(com.linguauniversalis.core.behavior.TemplateKeys.SPECIES_SIZE_CLASS,
+                        com.linguauniversalis.core.behavior.SleepRules.SizeClass.LARGE.id())
                 // TODO(档案定稿)：阿拉克涅最大生命与速度档在文档中未最终给出，先占位。
                 .stats(60f, SpeedTier.FAST)
-                .armor(6, 2) // 外壳界默认模板：自带护甲/韧性（数值占位，按模板可覆盖）
+                .armor(6, 2) // 外壳默认模板：自带护甲/韧性（数值占位，按模板可覆盖）
                 .likeFood("minecraft:beef", "minecraft:porkchop", "minecraft:chicken",
                         "minecraft:rabbit", "minecraft:mutton")
                 .combat(15f, 0f, 1f, 0f)
@@ -66,10 +80,10 @@ public final class BuiltinSpecies {
     }
 
     /**
-     * 猫又 nekomata —— 物质域/脊索界/外生息门/拟态同化纲/幽暗目/绒科。
+     * 猫又 nekomata —— 物质/脊索/外生息/拟态同化/幽暗/绒。
      * 自然刷新型；快捷栏：主手/副手 + 背包 8；生命 40，速度"快速"。
      *
-     * <p>社会习性使用「拟态同化纲」模板（{@link com.linguauniversalis.core.behavior.OrdoTemplates#MIMETICUS}），
+     * <p>社会习性使用「拟态同化」模板（{@link com.linguauniversalis.core.behavior.OrdoTemplates#MIMETICUS}），
      * 并开启档案级"野生猎亡灵"半径。
      */
     private static void registerNekomata() {
@@ -82,13 +96,17 @@ public final class BuiltinSpecies {
                 // 【物种变量】巢穴方块：猫又设计阶段即无巢穴 → 显式声明"无巢穴"
                 // （关闭认领/守巢/领地返回/无巢狂暴/巢穴增益等一切巢穴逻辑）
                 .nestBlockNone()
+                .spawnTags("村庄")
+                // 自然生成：森林与平原的夜晚（猫又喜欢有人烟又有树的地方）
+                .spawnRule(new com.linguauniversalis.core.species.SpawnRule(
+                        java.util.List.of("#minecraft:is_forest", "minecraft:plains"), 6, 1, 50, 200, 15))
                 .hotbar("main_hand", "off_hand")
                 .backpack(8)
-                // 拟态同化纲模板参数：野生猎亡灵半径（0=不猎）
+                // 拟态同化模板参数：野生猎亡灵半径（0=不猎）
                 .templateParam(com.linguauniversalis.core.behavior.OrdoTemplates.KEY_UNDEAD_HUNT_RADIUS, 16.0)
-                // 专属战斗能力（设计 §12）：绒科流血（命中刷新 10 秒、层级+1，无上限，
+                // 专属战斗能力（设计 §12）：绒流血（命中刷新 10 秒、层级+1，无上限，
                 // 每 2 秒造成等于层级的物理伤害）；暗影箭（8 格外每 10 秒一发、10 伤、魔法伤害）；
-                // 绒科闪避（周期性免疫弹射物 + 侧/后位移）
+                // 绒闪避（周期性免疫弹射物 + 侧/后位移）
                 .templateParam(com.linguauniversalis.core.behavior.TemplateKeys.ABILITY_BLEED_REFRESH_TICKS, 200.0)
                 .templateParam(com.linguauniversalis.core.behavior.TemplateKeys.ABILITY_BLEED_TICK_INTERVAL_TICKS, 40.0)
                 .templateParam(com.linguauniversalis.core.behavior.TemplateKeys.ABILITY_SHADOW_BOLT_COOLDOWN_TICKS, 200.0)
@@ -99,11 +117,14 @@ public final class BuiltinSpecies {
                 // 伪装形态（设计 §12）：野生/友善默认以双尾黑猫出现；空手右键/受伤/主动攻击现人形；
                 // 投喂不现形；人形后 60 秒无事恢复猫形；成为伙伴后伪装习性失效
                 .templateFlag(com.linguauniversalis.core.behavior.TemplateKeys.FLAG_SPECIES_DISGUISE, true)
+                // 变形形态：指向 DisguiseRegistry 里登记的形态（换成别的物种时改这一行即可）
+                .templateText(com.linguauniversalis.core.behavior.TemplateKeys.SPECIES_DISGUISE_FORM,
+                        DisguiseRegistry.NEKOMATA_CAT)
                 .templateParam(
                         com.linguauniversalis.core.behavior.TemplateKeys.SPECIES_DISGUISE_REVERT_TICKS, 1200.0)
                 // 社交习性（设计 §12）：偷鱼（5 分钟/次，仅游荡状态，只偷背包里的鱼）；
                 // 每天 50% 偷村民绿宝石 1–3 颗；偷窃成功后在玩家睡醒时赠送礼物；
-                // 亡灵视野内每天一次 +1 心情（由幽暗目模板默认提供）
+                // 亡灵视野内每天一次 +1 心情（由幽暗模板默认提供）
                 .templateFlag(com.linguauniversalis.core.behavior.TemplateKeys.FLAG_SPECIES_STEALS_FISH, true)
                 .templateParam(
                         com.linguauniversalis.core.behavior.TemplateKeys.SPECIES_FISH_STEAL_INTERVAL_TICKS, 6000.0)
@@ -113,15 +134,24 @@ public final class BuiltinSpecies {
                 .templateParam(
                         com.linguauniversalis.core.behavior.TemplateKeys.SPECIES_VILLAGE_CAT_CONVERSION, 0.5)
                 // 体型：碰撞箱 0.6 × 1.5（爬行姿态，宽按建模方要求改回 0.6）；
-                // 视线高度 = 模型 ViewLocator 骨骼枢轴 Y（34.47642）÷ 16 = 2.1548 格
+                // 视线高度 = 模型 **EyesLocator** 骨骼枢轴 Y（35.47642）÷ 16 = 2.217276 格
+                //   （工作流约定见 core/anim/LocatorRules：眼睛坐标一律以 EyesLocator 为准，
+                //    冒烟测试会拿档案值和模型 pivot 对表，改模型不动档案就会报警）
                 .templateParam(com.linguauniversalis.core.behavior.TemplateKeys.SPECIES_BODY_WIDTH, 0.6)
                 .templateParam(com.linguauniversalis.core.behavior.TemplateKeys.SPECIES_BODY_HEIGHT, 1.5)
-                .templateParam(com.linguauniversalis.core.behavior.TemplateKeys.SPECIES_EYE_HEIGHT, 2.1548)
+                .templateParam(com.linguauniversalis.core.behavior.TemplateKeys.SPECIES_EYE_HEIGHT, 2.217276)
                 // 移动速度：两档 —— walk 倍率（所有物种默认 1.0）+ 最快倍率。
                 // 最快档标定：玩家疾跑 = 1.3 × 玩家走路；这里要"玩家疾跑的 1.3 倍"
                 //   ⇒ 相对走路 ≈ 1.3 × 1.3 ≈ 1.7（0.25 × 1.7 = 0.425 格/tick ≈ 8.5 格/秒）
                 .templateParam(com.linguauniversalis.core.behavior.TemplateKeys.SPECIES_WALK_SPEED_SCALE, 1.0)
                 .templateParam(com.linguauniversalis.core.behavior.TemplateKeys.SPECIES_FAST_SPEED_SCALE, 1.7)
+                // 猫系特性：猫又毕竟是猫 —— 赶走附近的苦力怕/幻翼（见 CatTraitRules）
+                .templateFlag(com.linguauniversalis.core.behavior.TemplateKeys.FLAG_SPECIES_CAT_TRAITS, true)
+                // 睡眠习性：夜行性（白天睡；无巢穴 → 伙伴档去"中魔物床"睡，野生不睡）
+                .templateFlag(com.linguauniversalis.core.behavior.TemplateKeys.FLAG_SPECIES_NOCTURNAL, true)
+                // 体型：中（对应"中魔物床"）
+                .templateParam(com.linguauniversalis.core.behavior.TemplateKeys.SPECIES_SIZE_CLASS,
+                        com.linguauniversalis.core.behavior.SleepRules.SizeClass.MEDIUM.id())
                 .stats(40f, SpeedTier.FAST)
                 .likeFood("minecraft:cod", "minecraft:salmon", "minecraft:tropical_fish", "minecraft:pufferfish")
                 .combat(5f, 10f, 5f, 0.5f)

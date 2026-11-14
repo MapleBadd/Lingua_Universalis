@@ -3,7 +3,7 @@ package com.linguauniversalis.core.behavior;
 import com.linguauniversalis.core.species.SpeciesProfile;
 
 /**
- * 领地巡游纲模板 —— 巢心守卫实现（阿拉克涅等物种使用，设计汇总 §11）。
+ * 领地巡游模板 —— 巢心守卫实现（阿拉克涅等物种使用，设计汇总 §11）。
  *
  * <p>几何/判定模型，供 AI 层调用。领地水平半径与威胁半径<b>不写死在本类</b>，
  * 而是取 {@link OrdoTemplates#TERRITORIALIS} 的模板默认值，并允许按物种档案参数覆盖：
@@ -45,7 +45,7 @@ public final class NestGuard {
         this.threatRadius = threatRadius;
     }
 
-    /** 按物种档案（领地巡游纲 + 参数覆盖）创建巢心守卫。 */
+    /** 按物种档案（领地巡游 + 参数覆盖）创建巢心守卫。 */
     public static NestGuard fromProfile(SpeciesProfile profile, long nestX, long nestY, long nestZ) {
         OrdoTemplates.OrdoTemplate t = OrdoTemplates.of(profile);
         return new NestGuard(nestX, nestY, nestZ,

@@ -30,6 +30,22 @@ public final class LUIds {
     public static final String ITEM_DEBUG_AFFECTION = "debug_affection";
     /** 调试：好感提升道具小号（右键 +1 好感，不设每日上限）。 */
     public static final String ITEM_DEBUG_AFFECTION_1 = "debug_affection_1";
+    /** 调试：饥馑之实（右键魔物娘 -2 饱食度）。 */
+    public static final String ITEM_DEBUG_FAMINE_FRUIT = "debug_famine_fruit";
+    /** 调试：饱和之实（右键魔物娘 +2 饱食度）。 */
+    public static final String ITEM_DEBUG_SATIETY_FRUIT = "debug_satiety_fruit";
+    /** 中魔物床：中体型魔物娘睡觉用（未来会有小/大/超大）。 */
+    public static final String BLOCK_MONSTER_BED = "monster_bed";
+    /** 通用刷怪蛋（monster_girl 实体）。 */
+    public static final String ITEM_MONSTER_GIRL_SPAWN_EGG = "monster_girl_spawn_egg";
+    /** 调试：状态切换棒（右键循环 正常/休眠/战败，强制保持）。 */
+    public static final String ITEM_DEBUG_STATE_STICK = "debug_state_stick";
+    /** 创造模式负好感之实（-1 好感）。 */
+    public static final String ITEM_DEBUG_NEGATIVE_AFFECTION = "debug_negative_affection";
+    /** 创造模式大负好感之实（-10 好感）。 */
+    public static final String ITEM_DEBUG_BIG_NEGATIVE_AFFECTION = "debug_big_negative_affection";
+    /** 哨子：切换周边魔物娘的被动/主动战斗模式。 */
+    public static final String ITEM_WHISTLE = "whistle";
     /** 刷怪蛋：阿拉克涅。 */
     public static final String ITEM_ARAKNE_SPAWN_EGG = "arakne_spawn_egg";
     /** 刷怪蛋：猫又。 */
@@ -49,6 +65,7 @@ public final class LUIds {
     public static final String BLOCK_ENTITY_CUBILE_ARANEAE = "cubile_araneae";
     /** 伙伴宝箱方块实体（54 格共享收纳）。 */
     public static final String BLOCK_ENTITY_COMPANION_CHEST = "chest_of_companions";
+    public static final String BLOCK_ENTITY_SCRIPTORIUM = "scriptorium";
 
     // ------------------------------------------------------------------ 世界生成
     /** 阿拉克涅巢穴结构（程序化生成的深色橡木巨树 + 蛛丝巢，见 ArakneNestFeature）。 */
@@ -75,4 +92,6 @@ public final class LUIds {
     public static final String MENU_GIRL_INVENTORY = "girl_inventory";
     /** 伙伴宝箱界面（54 格共享收纳）。 */
     public static final String MENU_COMPANION_CHEST = "companion_chest";
+
+    public static final String MENU_CODEX = "codex";
 }

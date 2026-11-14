@@ -1,6 +1,5 @@
 {
-    "parent": "minecraft:block/cross",
-    "textures": {
-        "cross": "minecraft:block/poppy"
-    }
+  "textures": {
+    "particle": "minecraft:block/rose_bush_top"
+  }
 }

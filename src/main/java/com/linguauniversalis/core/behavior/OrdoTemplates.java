@@ -10,7 +10,7 @@ import java.util.Map;
 /**
  * 纲（Ordo）行为模板注册表（模块化，设计汇总 §13）。
  *
- * <p>「领地巡游纲」等纲目行为是一份<b>算法模板</b>，物种通过其档案的
+ * <p>「领地巡游」等纲目行为是一份<b>算法模板</b>，物种通过其档案的
  * {@link SpeciesProfile#socialOrdo()} 选中模板，并用物种级参数
  * （territory 半径 / threat 半径 / 亡灵狩猎半径…）覆盖模板默认值。
  * 新增纲 = 注册一个模板实现；新增同纲物种 = 只写档案参数，不复制逻辑。
@@ -37,7 +37,7 @@ public final class OrdoTemplates {
     public interface OrdoTemplate {
         String taxonId();
 
-        /** 领地守卫：是否会在威胁范围内主动攻击玩家（如领地巡游纲）。 */
+        /** 领地守卫：是否会在威胁范围内主动攻击玩家（如领地巡游）。 */
         default boolean guardsTerritoryAgainstPlayers() {
             return false;
         }
@@ -69,7 +69,7 @@ public final class OrdoTemplates {
 
         /**
          * 该纲下的野生魔物娘是否会在<b>找不到巢穴</b>时狂暴。
-         * 模板默认 true（领地巡游纲等守巢纲：无巢即狂暴，直到认领到巢心）；
+         * 模板默认 true（领地巡游等守巢纲：无巢即狂暴，直到认领到巢心）；
          * 只有用刷怪蛋生成的该类个体在生成时才置为 false（见实体层 finalizeSpawn），
          * 避免"刷怪蛋一出场就狂暴"。物种级可用 TemplateKeys.ORDO_RAGE_WITHOUT_NEST 覆盖。
          */
@@ -129,7 +129,7 @@ public final class OrdoTemplates {
     }
 
     // ------------------------------------------------------------------ 内置模板
-    /** 领地巡游纲：默认领地 24 / 威胁 12（物种参数可覆盖）。 */
+    /** 领地巡游：默认领地 24 / 威胁 12（物种参数可覆盖）。 */
     public static final OrdoTemplate TERRITORIALIS = new OrdoTemplate() {
         @Override
         public String taxonId() {
@@ -162,7 +162,7 @@ public final class OrdoTemplates {
         }
     };
 
-    /** 拟态同化纲：对人类被动；猫又类物种经档案参数开启亡灵狩猎（默认半径 16）。 */
+    /** 拟态同化：对人类被动；猫又类物种经档案参数开启亡灵狩猎（默认半径 16）。 */
     public static final OrdoTemplate MIMETICUS = new OrdoTemplate() {
         @Override
         public String taxonId() {

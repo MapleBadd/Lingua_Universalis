@@ -1,29 +1,38 @@
-# Lingua Universalis - NeoForge mod metadata (static; version fields are literal).
+# 万象牧语 · Lingua Universalis
+# NeoForge 模组元数据（静态；版本号为字面量）
 #
-# 许可证 / License：PolyForm Noncommercial License 1.0.0（SPDX: PolyForm-Noncommercial-1.0.0；非 OSI 开源）
-#   - 允许非商业用途（个人/研究/业余，以及慈善/教育/公共机构等）；随附许可证全文或官网链接、保留 Required Notice
-#   - **一切商业用途都需事先获得作者书面授权**；中国网易版渠道仅限作者本人或授权者（见 LICENSE / README）
-# 该字段会在游戏的模组列表里显示，保持一行简短；完整条款见 LICENSE。
+# 许可证 / License：PolyForm Noncommercial License 1.0.0
+#   SPDX: PolyForm-Noncommercial-1.0.0（非 OSI 开源许可）
+#   - 允许非商业用途（个人、研究、业余，以及慈善/教育/公共机构等）；
+#     分发时须随附许可证全文或官网链接，并保留 Required Notice。
+#   - 一切商业用途都需事先获得作者书面授权；中国网易版渠道仅限作者本人或其授权者。
+#   该字段会显示在游戏的模组列表里，因此保持一行；完整条款见 LICENSE。
 license="PolyForm Noncommercial License 1.0.0"
 
 [[mods]]
 modId="lingua_universalis"
-version="0.1.0"
+version="0.0.1a"
 displayName="Lingua Universalis"
-description='''
-Lingua Universalis is a monster-girl raising mod themed around companions that
-talk with you, not mere pets.
 
-Species follow a custom taxonomy (regnum/phylum/classis/ordo/familia/sectio)
-driven by data templates: affection, mood, satiety and synergy form the raising
-state machine (wild/friendly/companion/vowed). Interactions, behaviors,
-low-mood behavior and animations are modular and registered per species, so new
-species need data plus assets instead of rewritten core logic.
+# 模组图标（哨子的 16×16 像素原图最近邻放大到 128×128，保留像素风）
+# 26.2 起 `logoFile` 已弃用，模组列表改用它自己的 `bannerFile`
+bannerFile="icon.png"
+# 方形图标：模组列表左侧条目的图标（26.2 用 iconFile，logoFile 已弃用）
+iconFile="icon.png"
+logoBlur=false
 
-Targets: Minecraft Java 26.2 + NeoForge. GeckoLib animation integration is
-planned for a later phase.
-'''
+# 作者与协作署名（显示在模组详情里）
+authors="Maple"
+credits="DeepSeek"
 
+description='''这是一个关于魔物娘的模组。'''
+
+# Mixin 配置：让原版"苦力怕躲猫 / 幻翼怕猫"的判定也认猫系魔物娘（见 com.linguauniversalis.mixin）
+displayURL="https://github.com/MapleBadd/Lingua_Universalis"
+issueTrackerURL="https://github.com/MapleBadd/Lingua_Universalis/issues"
+
+[[mixins]]
+    config="lingua_universalis.mixins.json"
 [[dependencies.lingua_universalis]]
     modId="neoforge"
     type="required"
@@ -44,3 +53,11 @@ planned for a later phase.
     versionRange="[5.5.5,)"
     ordering="NONE"
     side="BOTH"
+
+# JEI（配方查看）：**可选**前置，客户端装了才会加载我们的 JEI 插件
+[[dependencies.lingua_universalis]]
+    modId="jei"
+    type="optional"
+    versionRange="[30.0.0,)"
+    ordering="AFTER"
+    side="CLIENT"

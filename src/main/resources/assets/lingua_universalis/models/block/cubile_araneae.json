@@ -1,6 +1,7 @@
 {
-    "textures":  {
-                     "all":  "lingua_universalis:block/cubile_araneae"
-                 },
-    "parent":  "minecraft:block/cube_all"
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "lingua_universalis:block/cubile_araneae",
+    "particle": "lingua_universalis:block/particle_gray"
+  }
 }

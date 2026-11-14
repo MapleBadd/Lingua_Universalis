@@ -18,14 +18,107 @@ public class SmokeMain {
         }
     }
 
+    /** 缺"本质"一族的标签组（给冒烟断言用）。 */
+    static com.linguauniversalis.core.taxonomy.TaxonomyTagSet tagsMissingOne() {
+        return new com.linguauniversalis.core.taxonomy.TaxonomyTagSet(
+                null,
+                com.linguauniversalis.core.taxonomy.Taxonomy.Kingdom.CHORDATA,
+                com.linguauniversalis.core.taxonomy.Taxonomy.MagicClassis.EXOSPIRA,
+                com.linguauniversalis.core.taxonomy.Taxonomy.SocialOrdo.MIMETICUS,
+                com.linguauniversalis.core.taxonomy.Taxonomy.ElementFamilia.UMBRA,
+                com.linguauniversalis.core.taxonomy.Taxonomy.FormaSectio.PELLIS);
+    }
+
+    /**
+     * 整份 {@code en_us.json} 不允许出现中文字符（漏翻的兜底闸门）。
+     *
+     * <p>直接读源文件路径：冒烟测试从仓库根目录运行。
+     */
+    private static void checkLangEnglishClean() {
+        java.nio.file.Path file = java.nio.file.Path.of(
+                "src/main/resources/assets/lingua_universalis/lang/en_us.json");
+        if (!java.nio.file.Files.exists(file)) {
+            return; // 不在仓库根目录运行时跳过
+        }
+        try {
+            String text = java.nio.file.Files.readString(file, java.nio.charset.StandardCharsets.UTF_8);
+            check(!hasCjk(text), "en_us.json 仍含中文（漏翻）");
+        } catch (java.io.IOException failure) {
+            check(false, "读取 en_us.json 失败: " + failure);
+        }
+    }
+    /** 去掉 @key|c1|c2 里的键与参数占位，只留会原样显示的字面量。 */
+    private static String stripKeys(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        return raw.replaceAll("@[a-z0-9_.]+(\\|[^|@]*)*", "");
+    }
+
+    private static boolean hasCjk(String text) {
+        return text != null && text.matches("(?s).*[\\u4e00-\\u9fff].*");
+    }
+
     public static void main(String[] args) {
         com.linguauniversalis.core.taxonomy.Taxonomy.registerDefaults();
         com.linguauniversalis.core.behavior.TaxonTemplates.registerDefaults();
         com.linguauniversalis.core.behavior.OrdoTemplates.registerDefaults();
         com.linguauniversalis.core.species.BuiltinSpecies.registerAll();
         com.linguauniversalis.core.behavior.MoodLowTemplateRegistry.registerDefaults();
-        check(SpeciesRegistry.contains("arakne") && SpeciesRegistry.contains("nekomata"), "species registered");
+        // ---- 拼音搜索：全拼 / 首字母 / 中文原串
+        check(com.linguauniversalis.core.i18n.PinyinIndex.matches("maoyou", "猫又"), "pinyin full: maoyou");
+        check(com.linguauniversalis.core.i18n.PinyinIndex.matches("my", "猫又"), "pinyin initials: my");
+        check(com.linguauniversalis.core.i18n.PinyinIndex.matches("猫", "猫又"), "pinyin chinese passthrough");
+        check(com.linguauniversalis.core.i18n.PinyinIndex.matches("youan", "幽暗"), "pinyin tag: youan");
+        check(!com.linguauniversalis.core.i18n.PinyinIndex.matches("zzz", "猫又"), "pinyin negative");        // ---- 分类学标签化：六族齐全 + 挂错族检测
+        check(com.linguauniversalis.core.taxonomy.Taxonomy.Family.values().length == 6, "taxonomy has 6 families");
+        java.util.Set<String> familyIds = new java.util.HashSet<>();
+        for (com.linguauniversalis.core.taxonomy.Taxonomy.Family family
+                : com.linguauniversalis.core.taxonomy.Taxonomy.Family.values()) {
+            familyIds.add(family.id());
+        }
+        check(familyIds.size() == 6, "family ids are unique");
+        for (com.linguauniversalis.core.species.SpeciesProfile profile
+                : com.linguauniversalis.core.species.SpeciesRegistry.all()) {
+            com.linguauniversalis.core.taxonomy.TaxonomyTagSet tags = profile.tagSet();
+            check(tags.isComplete(), "tags complete: " + profile.id());
+            check(tags.validate().isEmpty(), "tags valid: " + profile.id());
+        }
+        // 挂错族必须被 validate 抓到
+        com.linguauniversalis.core.taxonomy.TaxonomyTagSet misplaced =
+                new com.linguauniversalis.core.taxonomy.TaxonomyTagSet(
+                        com.linguauniversalis.core.taxonomy.Taxonomy.ElementFamilia.UMBRA,
+                        com.linguauniversalis.core.taxonomy.Taxonomy.Kingdom.CHORDATA,
+                        com.linguauniversalis.core.taxonomy.Taxonomy.MagicClassis.EXOSPIRA,
+                        com.linguauniversalis.core.taxonomy.Taxonomy.SocialOrdo.MIMETICUS,
+                        com.linguauniversalis.core.taxonomy.Taxonomy.ElementFamilia.UMBRA,
+                        com.linguauniversalis.core.taxonomy.Taxonomy.FormaSectio.PELLIS);
+        check(!misplaced.validate().isEmpty(), "misplaced tag detected");
+        check(tagsMissingOne().missingFamilies().size() == 1, "missing family detected");        check(SpeciesRegistry.contains("arakne") && SpeciesRegistry.contains("nekomata"), "species registered");
         check("nekomata".equals(SpeciesRegistry.get("nekomata").id()), "nekomata profile id");
+
+        // ---- 语言文件闸门：en_us 里**不允许**残留中文（模组整体，不只是图鉴） ----
+        checkLangEnglishClean();
+
+        // ---- 图鉴本地化闸门：条目里**不允许**出现裸中文（必须走 @lang.key） ----
+        for (com.linguauniversalis.core.species.SpeciesProfile prof : SpeciesRegistry.all()) {
+            var known = java.util.EnumSet.allOf(com.linguauniversalis.core.encyclopedia.Encyclopedia.Kind.class);
+            for (var page : com.linguauniversalis.core.encyclopedia.CodexEntry.documentOf(prof, known)) {
+            for (var row : page.rows()) {
+                String plain = stripKeys(row.value());
+                check(!hasCjk(plain), "codex value not localized: " + prof.id() + " / " + row.labelKey()
+                        + " = " + row.value());
+                for (String tag : row.tags()) {
+                    String tagPlain = stripKeys(tag);
+                    check(!hasCjk(tagPlain), "codex tag not localized: " + prof.id() + " = " + tag);
+                }
+                if (row.tooltip() != null) {
+                    String tipPlain = stripKeys(row.tooltip());
+                    check(!hasCjk(tipPlain), "codex tooltip not localized: " + prof.id() + " / " + row.labelKey());
+                }
+            }
+            }
+        }
 
         DailyInteractionTracker tracker = new DailyInteractionTracker();
         MonsterGirlState s = new MonsterGirlState();
@@ -618,21 +711,21 @@ public class SmokeMain {
         // 分类学模块化：可增删类目（模拟附属模组注册新科）
         com.linguauniversalis.core.taxonomy.Taxonomy.Taxon customSectio =
                 com.linguauniversalis.core.taxonomy.Taxonomy.taxon(
-                        com.linguauniversalis.core.taxonomy.Taxonomy.Rank.SECTIO,
+                        com.linguauniversalis.core.taxonomy.Taxonomy.Family.FORM,
                         "customia", "sectio customia", "自定义科");
         int sectioBefore = com.linguauniversalis.core.taxonomy.Taxonomy.count(
-                com.linguauniversalis.core.taxonomy.Taxonomy.Rank.SECTIO);
+                com.linguauniversalis.core.taxonomy.Taxonomy.Family.FORM);
         com.linguauniversalis.core.taxonomy.Taxonomy.register(customSectio);
         check(com.linguauniversalis.core.taxonomy.Taxonomy.contains(
-                        com.linguauniversalis.core.taxonomy.Taxonomy.Rank.SECTIO, "customia")
+                        com.linguauniversalis.core.taxonomy.Taxonomy.Family.FORM, "customia")
                 && com.linguauniversalis.core.taxonomy.Taxonomy.count(
-                        com.linguauniversalis.core.taxonomy.Taxonomy.Rank.SECTIO) == sectioBefore + 1,
+                        com.linguauniversalis.core.taxonomy.Taxonomy.Family.FORM) == sectioBefore + 1,
                 "taxonomy category registered (addon extensible)");
         check(com.linguauniversalis.core.taxonomy.Taxonomy.unregister(
-                        com.linguauniversalis.core.taxonomy.Taxonomy.Rank.SECTIO, "customia"),
+                        com.linguauniversalis.core.taxonomy.Taxonomy.Family.FORM, "customia"),
                 "taxonomy category removed");
         check(!com.linguauniversalis.core.taxonomy.Taxonomy.contains(
-                        com.linguauniversalis.core.taxonomy.Taxonomy.Rank.SECTIO, "customia"),
+                        com.linguauniversalis.core.taxonomy.Taxonomy.Family.FORM, "customia"),
                 "taxonomy category gone after removal");
 
         // 模板键目录与纲模板键同源（防漂移）
@@ -921,26 +1014,26 @@ public class SmokeMain {
         // 动画规则（通用约定：main 互斥+过渡 / 混合项 / 随机每秒 3% 同系列互斥 / 空中优先于走跑 / 跳跃→空中）
         check(com.linguauniversalis.core.anim.AnimationRules.MAIN_TRANSITION_TICKS > 0,
                 "main animations transition instead of hard-cutting");
-        check(com.linguauniversalis.core.anim.AnimationRules.mainAnimation(false, false, false, false, false)
+        check(com.linguauniversalis.core.anim.AnimationRules.mainAnimation(false, false, false, false, false, false)
                         .equals(com.linguauniversalis.core.anim.AnimationRules.MAIN_IDLE)
-                        && com.linguauniversalis.core.anim.AnimationRules.mainAnimation(false, false, false, false, true)
+                        && com.linguauniversalis.core.anim.AnimationRules.mainAnimation(false, false, false, false, false, true)
                         .equals(com.linguauniversalis.core.anim.AnimationRules.MAIN_WALK),
                 "main: idle when still / walk when moving");
-        check(com.linguauniversalis.core.anim.AnimationRules.mainAnimation(false, true, false, false, true)
+        check(com.linguauniversalis.core.anim.AnimationRules.mainAnimation(false, true, false, false, false, true)
                         .equals(com.linguauniversalis.core.anim.AnimationRules.MAIN_AIRBORNE)
-                        && com.linguauniversalis.core.anim.AnimationRules.mainAnimation(false, true, true, false, true)
+                        && com.linguauniversalis.core.anim.AnimationRules.mainAnimation(false, true, true, false, false, true)
                         .equals(com.linguauniversalis.core.anim.AnimationRules.MAIN_AIRBORNE)
-                        && com.linguauniversalis.core.anim.AnimationRules.mainAnimation(false, true, false, true, true)
+                        && com.linguauniversalis.core.anim.AnimationRules.mainAnimation(false, true, false, false, true, true)
                         .equals(com.linguauniversalis.core.anim.AnimationRules.MAIN_AIRBORNE),
                 "airborne outranks walk / eat / sit while falling");
-        check(com.linguauniversalis.core.anim.AnimationRules.mainAnimation(true, true, false, false, true)
+        check(com.linguauniversalis.core.anim.AnimationRules.mainAnimation(true, true, false, false, false, true)
                         .equals(com.linguauniversalis.core.anim.AnimationRules.MAIN_JUMP)
-                        && com.linguauniversalis.core.anim.AnimationRules.mainAnimation(true, false, false, false, false)
+                        && com.linguauniversalis.core.anim.AnimationRules.mainAnimation(true, false, false, false, false, false)
                         .equals(com.linguauniversalis.core.anim.AnimationRules.MAIN_JUMP),
                 "jump animation wins while it is playing");
-        check(com.linguauniversalis.core.anim.AnimationRules.mainAnimation(false, false, true, false, false)
+        check(com.linguauniversalis.core.anim.AnimationRules.mainAnimation(false, false, true, false, false, false)
                         .equals(com.linguauniversalis.core.anim.AnimationRules.MAIN_EAT)
-                        && com.linguauniversalis.core.anim.AnimationRules.mainAnimation(false, false, false, true, false)
+                        && com.linguauniversalis.core.anim.AnimationRules.mainAnimation(false, false, false, false, true, false)
                         .equals(com.linguauniversalis.core.anim.AnimationRules.MAIN_SIT),
                 "eat / sit main states");
         check(!com.linguauniversalis.core.anim.AnimationRules.isAirborne(true, false, false)
@@ -1093,6 +1186,17 @@ public class SmokeMain {
                 "head pitch clamped to ±60°");
         check(Math.abs(com.linguauniversalis.core.anim.HeadLookRules.toRadians(180.0) - (float) Math.PI) < 1.0e-6,
                 "degrees convert to radians for bone rotation");
+        // 低头分量衰减：向下（正值）压扁、向上（负值）不变 —— 她眼高 2.1548 高于玩家眼睛 1.62，
+        // 原版瞄"玩家眼睛"会低头 15~25°，压扁后才不会看起来盯着脚
+        check(Math.abs(com.linguauniversalis.core.anim.HeadLookRules.softenDownPitch(
+                        20.0, com.linguauniversalis.core.anim.HeadLookRules.DOWN_PITCH_SCALE) - 6.0) < 1.0e-9
+                        && com.linguauniversalis.core.anim.HeadLookRules.softenDownPitch(-20.0, 0.3) == -20.0
+                        && com.linguauniversalis.core.anim.HeadLookRules.softenDownPitch(0.0, 0.3) == 0.0
+                        && com.linguauniversalis.core.anim.HeadLookRules.softenDownPitch(20.0, 1.0) == 20.0
+                        && com.linguauniversalis.core.anim.HeadLookRules.softenDownPitch(20.0, 0.0) == 0.0
+                        && com.linguauniversalis.core.anim.HeadLookRules.DOWN_PITCH_SCALE > 0.0
+                        && com.linguauniversalis.core.anim.HeadLookRules.DOWN_PITCH_SCALE < 1.0,
+                "downward pitch is damped (looking at a player no longer stares at the ground)");
 
         // ---------------------------------------------------------------- 模型骨骼名对表
         java.nio.file.Path geoFile = java.nio.file.Path.of(
@@ -1118,11 +1222,55 @@ public class SmokeMain {
                 com.linguauniversalis.core.species.BodyRules.of(nekoForSpawn);
         check(Math.abs(nekoSize.width() - 0.6f) < 1.0e-6 && Math.abs(nekoSize.height() - 1.5f) < 1.0e-6,
                 "nekomata hitbox is 0.6 x 1.5 (crawling pose)");
-        check(Math.abs(nekoSize.eyeHeight() - 2.1548f) < 1.0e-4,
-                "nekomata eye height follows the ViewLocator pivot (34.47642/16)");
+        check(Math.abs(nekoSize.eyeHeight() - 2.217276f) < 1.0e-4,
+                "nekomata eye height follows the EyesLocator pivot (35.47642/16)");
+        // 定位骨骼工作流对表：档案视线高度必须等于模型 EyesLocator 的 pivotY/16，
+        // 并且主/副手定位骨骼必须分别挂在 RightPaw / LeftPaw 下（眼睛与手持物品都以 locator 为准）
+        java.nio.file.Path locatorModelFile = java.nio.file.Path.of(
+                "src/main/resources/assets/lingua_universalis/geckolib/models/nekomata.geo.json");
+        String locatorModelJson = null;
+        try {
+            if (java.nio.file.Files.isRegularFile(locatorModelFile)) {
+                locatorModelJson = new String(java.nio.file.Files.readAllBytes(locatorModelFile),
+                        java.nio.charset.StandardCharsets.UTF_8);
+            }
+        } catch (java.io.IOException readFailed) {
+            locatorModelJson = null;
+        }
+        if (locatorModelJson != null) {
+            check(locatorModelJson.contains(com.linguauniversalis.core.anim.LocatorRules.EYES_LOCATOR),
+                    "model provides the EyesLocator used for the eye position");
+            check(com.linguauniversalis.core.anim.LocatorRules.eyeHeightMatches(
+                            nekoSize.eyeHeight(), 35.47642),
+                    "profile eye height matches EyesLocator pivotY/16 (change one, the smoke test complains)");
+            check(locatorModelJson.contains("RightPaw") && locatorModelJson.contains("LeftPaw"),
+                    "model provides both paw bones the held-item locators hang from");
+            check("RightPaw".equals(boneParentOf(locatorModelJson, "RightPawLocator"))
+                            && "LeftPaw".equals(boneParentOf(locatorModelJson, "RightPawLocator2")),
+                    "held-item locators hang under RightPaw/LeftPaw (the side comes from the parent bone,"
+                            + " not from the misleading locator name)");
+        } else {
+            System.out.println("skip: nekomata model not found (locator cross-check)");
+        }
+        check(com.linguauniversalis.core.anim.LocatorRules.pawLocatorSide("RightPaw")
+                        == com.linguauniversalis.core.anim.LocatorRules.PawSide.MAIN
+                        && com.linguauniversalis.core.anim.LocatorRules.pawLocatorSide("LeftPaw")
+                                == com.linguauniversalis.core.anim.LocatorRules.PawSide.OFF
+                        && com.linguauniversalis.core.anim.LocatorRules.pawLocatorSide("AllHead") == null
+                        && com.linguauniversalis.core.anim.LocatorRules.isEyesLocator("EyesLocator")
+                        && com.linguauniversalis.core.anim.LocatorRules.isEyesLocator("ViewLocator")
+                        && !com.linguauniversalis.core.anim.LocatorRules.isEyesLocator("RightPawLocator")
+                        && com.linguauniversalis.core.anim.LocatorRules.isLocatorName("RightPawLocator2")
+                        && Math.abs(com.linguauniversalis.core.anim.LocatorRules.modelUnitsToBlocks(35.47642)
+                                - 2.217276) < 1.0e-6
+                        && "RightPawLocator".equals(com.linguauniversalis.core.anim.LocatorRules.pawLocatorName(
+                                com.linguauniversalis.core.anim.LocatorRules.PawSide.MAIN))
+                        && "LeftPawLocator".equals(com.linguauniversalis.core.anim.LocatorRules.pawLocatorName(
+                                com.linguauniversalis.core.anim.LocatorRules.PawSide.OFF)),
+                "locator conventions: paw side comes from the parent bone, eyes locator by name");
         com.linguauniversalis.core.species.BodyRules.Size scaledSize =
                 com.linguauniversalis.core.species.BodyRules.of(nekoForSpawn, 0.5);
-        check(Math.abs(scaledSize.eyeHeight() - 1.0774f) < 1.0e-4
+        check(Math.abs(scaledSize.eyeHeight() - 1.108638f) < 1.0e-4
                         && Math.abs(scaledSize.height() - 1.5f) < 1.0e-6,
                 "render scale moves the eye with the model but not the hitbox");
         com.linguauniversalis.core.species.BodyRules.Size araSize =
@@ -1145,8 +1293,8 @@ public class SmokeMain {
                         && settings.jumpTransitionTicks() == 0
                         && com.linguauniversalis.core.anim.AnimationRules.JUMP_ANIM_TICKS >= 10
                         && settings.headLookFollowPitch()
-                        && settings.lookAtNearbyPlayer()
-                        && settings.modelRenderScale() == 1.0,
+                        && settings.modelRenderScale() == 1.0
+&& settings.headLookCompensatePose(),
                 "settings defaults are sane");
         java.nio.file.Path settingsFile = java.nio.file.Path.of("build/smoke-settings.properties");
         try {
@@ -1352,34 +1500,31 @@ public class SmokeMain {
                 "backpack size is clamped to 0..27");
 
         // ---------------------------------------------------------------- GUI 布局（漏斗占位面板）
+        // ---------------------------------------------------------------- GUI 布局（美术固定 176×220）
         check(com.linguauniversalis.core.gui.GirlInventoryLayout.backpackRows(0) == 0
                         && com.linguauniversalis.core.gui.GirlInventoryLayout.backpackRows(8) == 1
                         && com.linguauniversalis.core.gui.GirlInventoryLayout.backpackRows(9) == 1
                         && com.linguauniversalis.core.gui.GirlInventoryLayout.backpackRows(10) == 2
                         && com.linguauniversalis.core.gui.GirlInventoryLayout.backpackRows(27) == 3,
                 "pack rows: 8/9 slots = one row, 27 slots = three rows");
-        check(com.linguauniversalis.core.gui.GirlInventoryLayout.hotbarSlotX(2, 0) == 70
-                        && com.linguauniversalis.core.gui.GirlInventoryLayout.hotbarSlotX(2, 1) == 88
-                        && com.linguauniversalis.core.gui.GirlInventoryLayout.hotbarSlotX(4, 0) == 52
-                        && com.linguauniversalis.core.gui.GirlInventoryLayout.hotbarSlotX(4, 3) == 106,
-                "hotbar row is centred (2 slots = main/off hand, 4 = arakne)");
-        check(com.linguauniversalis.core.gui.GirlInventoryLayout.backpackSlotX(8, 0) == 16
-                        && com.linguauniversalis.core.gui.GirlInventoryLayout.backpackSlotX(9, 0) == 7
-                        && com.linguauniversalis.core.gui.GirlInventoryLayout.backpackSlotX(10, 9) == 79
-                        && com.linguauniversalis.core.gui.GirlInventoryLayout.backpackSlotX(10, 1) == 25
-                        && com.linguauniversalis.core.gui.GirlInventoryLayout.backpackSlotY(0)
-                                == com.linguauniversalis.core.gui.GirlInventoryLayout.BACKPACK_Y
-                        && com.linguauniversalis.core.gui.GirlInventoryLayout.backpackSlotY(9)
-                                == com.linguauniversalis.core.gui.GirlInventoryLayout.BACKPACK_Y + 18,
-                "pack rows are centred per row and stack downward");
-        check(com.linguauniversalis.core.gui.GirlInventoryLayout.imageHeight(8) == 192
-                        && com.linguauniversalis.core.gui.GirlInventoryLayout.imageHeight(9) == 192
-                        && com.linguauniversalis.core.gui.GirlInventoryLayout.imageHeight(27) == 228
-                        && com.linguauniversalis.core.gui.GirlInventoryLayout.panelMiddleHeight(
-                                com.linguauniversalis.core.gui.GirlInventoryLayout.imageHeight(8)) == 167
-                        && com.linguauniversalis.core.gui.GirlInventoryLayout.playerInventoryY(8)
-                                == com.linguauniversalis.core.gui.GirlInventoryLayout.playerInventoryLabelY(8) + 12,
-                "panel height follows the pack rows (top 18 + stretch + bottom 7 pieces)");
+        // 快捷栏从左往右排（不再居中）：主手→副手→附肢1…
+        check(com.linguauniversalis.core.gui.GirlInventoryLayout.hotbarSlotX(0) == 8
+                        && com.linguauniversalis.core.gui.GirlInventoryLayout.hotbarSlotX(1) == 26
+                        && com.linguauniversalis.core.gui.GirlInventoryLayout.hotbarSlotX(3) == 62
+                        && com.linguauniversalis.core.gui.GirlInventoryLayout.hotbarSlotY(0) == 35,
+                "hotbar fills from the left: main hand, off hand, appendage1..");
+        // 背包格位（每行 9 格，左对齐）
+        check(com.linguauniversalis.core.gui.GirlInventoryLayout.backpackSlotX(0) == 8
+                        && com.linguauniversalis.core.gui.GirlInventoryLayout.backpackSlotX(1) == 26
+                        && com.linguauniversalis.core.gui.GirlInventoryLayout.backpackSlotX(9) == 8
+                        && com.linguauniversalis.core.gui.GirlInventoryLayout.backpackSlotY(0) == 71
+                        && com.linguauniversalis.core.gui.GirlInventoryLayout.backpackSlotY(9) == 89,
+                "backpack rows are left-aligned and stack downward (y=71/89/107)");
+        check(com.linguauniversalis.core.gui.GirlInventoryLayout.imageHeight(0) == 220
+                        && com.linguauniversalis.core.gui.GirlInventoryLayout.imageHeight(27) == 220
+                        && com.linguauniversalis.core.gui.GirlInventoryLayout.PANEL_WIDTH == 176
+                        && com.linguauniversalis.core.gui.GirlInventoryLayout.playerInventoryY(8) == 139,
+                "panel is the art's fixed 176x220");
         // 槽位不重叠、且都在面板内（她的槽位 + 玩家 36 格）
         boolean uniqueAndInside = true;
         java.util.Set<String> seen = new java.util.HashSet<>();
@@ -1387,15 +1532,14 @@ public class SmokeMain {
             int sx = com.linguauniversalis.core.gui.GirlInventoryLayout.girlSlotX(nekoInv, i);
             int sy = com.linguauniversalis.core.gui.GirlInventoryLayout.girlSlotY(nekoInv, i);
             uniqueAndInside &= seen.add(sx + "," + sy)
-                    && sx >= 1 && sx + 18 <= 175 && sy >= 1
-                    && sy + 18 <= com.linguauniversalis.core.gui.GirlInventoryLayout.imageHeight(
-                            com.linguauniversalis.core.behavior.InventoryRules.backpackSlots(nekoInv)) - 7;
+                    && sx >= 1 && sx + 16 <= 175 && sy >= 1
+                    && sy + 16 <= com.linguauniversalis.core.gui.GirlInventoryLayout.PANEL_HEIGHT - 1;
         }
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
                 int sx = 8 + col * 18;
                 int sy = com.linguauniversalis.core.gui.GirlInventoryLayout.playerInventoryY(8) + row * 18;
-                uniqueAndInside &= seen.add(sx + "," + sy) && sx + 18 <= 175;
+                uniqueAndInside &= seen.add(sx + "," + sy) && sx + 16 <= 175;
             }
         }
         for (int col = 0; col < 9; col++) {
@@ -1449,9 +1593,404 @@ public class SmokeMain {
                         && com.linguauniversalis.core.behavior.InventoryRules.hotbarSlots(nekoInv) == 2,
                 "cat girl keeps 2 hotbar slots + 8 backpack slots for these behaviors");
 
+        // ---------------------------------------------------------------- 战斗模式（被动/主动）
+        check(com.linguauniversalis.core.behavior.CombatModeRules.DEFAULT_MODE
+                        == com.linguauniversalis.core.behavior.CombatModeRules.CombatMode.PASSIVE
+                        && com.linguauniversalis.core.behavior.CombatModeRules.toggle(
+                                com.linguauniversalis.core.behavior.CombatModeRules.CombatMode.PASSIVE)
+                                == com.linguauniversalis.core.behavior.CombatModeRules.CombatMode.AGGRESSIVE
+                        && com.linguauniversalis.core.behavior.CombatModeRules.toggle(
+                                com.linguauniversalis.core.behavior.CombatModeRules.CombatMode.AGGRESSIVE)
+                                == com.linguauniversalis.core.behavior.CombatModeRules.CombatMode.PASSIVE,
+                "combat mode defaults to passive and toggles between passive/aggressive");
+        check(com.linguauniversalis.core.behavior.CombatModeRules.assistsOwner(
+                                com.linguauniversalis.core.behavior.CombatModeRules.CombatMode.AGGRESSIVE)
+                        && !com.linguauniversalis.core.behavior.CombatModeRules.assistsOwner(
+                                com.linguauniversalis.core.behavior.CombatModeRules.CombatMode.PASSIVE)
+                        && com.linguauniversalis.core.behavior.CombatModeRules.shouldAssist(
+                                com.linguauniversalis.core.behavior.CombatModeRules.CombatMode.AGGRESSIVE,
+                                true, true)
+                        && !com.linguauniversalis.core.behavior.CombatModeRules.shouldAssist(
+                                com.linguauniversalis.core.behavior.CombatModeRules.CombatMode.AGGRESSIVE,
+                                false, true)
+                        && !com.linguauniversalis.core.behavior.CombatModeRules.mayHuntFreely(true)
+                        && com.linguauniversalis.core.behavior.CombatModeRules.mayHuntFreely(false),
+                "only aggressive + bonded girls assist; bonded girls never hunt on their own");
+        check(Math.abs(com.linguauniversalis.core.behavior.CombatModeRules.WHISTLE_RADIUS_BLOCKS - 32.0) < 1.0e-9
+                        && com.linguauniversalis.core.behavior.CombatModeRules.withinWhistleRange(32.0 * 32.0)
+                        && !com.linguauniversalis.core.behavior.CombatModeRules.withinWhistleRange(32.01 * 32.01),
+                "whistle reaches exactly 32 blocks around the player");
+
+        // ---------------------------------------------------------------- 头顶状态牌
+        com.linguauniversalis.core.behavior.CombatModeRules.CombatMode aggr =
+                com.linguauniversalis.core.behavior.CombatModeRules.CombatMode.AGGRESSIVE;
+        check(com.linguauniversalis.core.behavior.StatusPlateRules.statusOf(false, false, 0L, aggr).kind()
+                        == com.linguauniversalis.core.behavior.StatusPlateRules.StatusKind.MODE
+                        && com.linguauniversalis.core.behavior.StatusPlateRules.statusOf(false, false, 0L, aggr).mode()
+                                == aggr
+                        && com.linguauniversalis.core.behavior.StatusPlateRules.statusOf(true, false, 0L, aggr).kind()
+                                == com.linguauniversalis.core.behavior.StatusPlateRules.StatusKind.DORMANT,
+                "status plate shows the combat mode, and dormant overrides it");
+        check(com.linguauniversalis.core.behavior.StatusPlateRules.statusOf(false, true, 1200L, aggr).kind()
+                                == com.linguauniversalis.core.behavior.StatusPlateRules.StatusKind.DEFEATED
+                        && com.linguauniversalis.core.behavior.StatusPlateRules.statusOf(false, true, 1200L, aggr)
+                                .seconds() == 60
+                        && com.linguauniversalis.core.behavior.StatusPlateRules.statusOf(false, true, 0L, aggr).kind()
+                                == com.linguauniversalis.core.behavior.StatusPlateRules.StatusKind.DYING
+                        && com.linguauniversalis.core.behavior.StatusPlateRules.statusForDisplay(false, true, 42, aggr)
+                                .seconds() == 42,
+                "downed shows the knockdown countdown in seconds, then switches to dying");
+        check(com.linguauniversalis.core.behavior.StatusPlateRules.secondsFromTicks(1L) == 1
+                        && com.linguauniversalis.core.behavior.StatusPlateRules.secondsFromTicks(20L) == 1
+                        && com.linguauniversalis.core.behavior.StatusPlateRules.secondsFromTicks(21L) == 2
+                        && com.linguauniversalis.core.behavior.StatusPlateRules.secondsFromTicks(0L) == 0
+                        && com.linguauniversalis.core.behavior.StatusPlateRules.shouldShow(24.0 * 24.0)
+                        && !com.linguauniversalis.core.behavior.StatusPlateRules.shouldShow(24.01 * 24.01),
+                "plate seconds round up, and the plate only renders within 24 blocks");
+
+        // ---------------------------------------------------------------- 注意力（什么状态不盯玩家）
+        check(com.linguauniversalis.core.behavior.AttentionRules.shouldLookAtPlayers(
+                                false, false, false, false, false, false)
+                        && !com.linguauniversalis.core.behavior.AttentionRules.shouldLookAtPlayers(
+                                false, false, false, true, false, false)
+                        && !com.linguauniversalis.core.behavior.AttentionRules.shouldLookAtPlayers(
+                                false, false, false, false, true, false)
+                        && !com.linguauniversalis.core.behavior.AttentionRules.shouldLookAtPlayers(
+                                true, false, false, false, false, false)
+                        && !com.linguauniversalis.core.behavior.AttentionRules.shouldLookAtPlayers(
+                                false, true, false, false, false, false)
+                        && !com.linguauniversalis.core.behavior.AttentionRules.shouldGlanceAround(
+                                false, false, false, true, false)
+                        && !com.linguauniversalis.core.behavior.AttentionRules.shouldLookAtPlayers(
+                                false, false, false, false, false, true)
+                        && !com.linguauniversalis.core.behavior.AttentionRules.shouldGlanceAround(
+                                false, false, false, false, true),
+                "she does not stare at the player while eating/fighting/dormant/downed/sleeping");
+        check(com.linguauniversalis.core.behavior.AttentionRules.suppressesFacing(true, false, false)
+                        && com.linguauniversalis.core.behavior.AttentionRules.suppressesFacing(false, true, false)
+                        && com.linguauniversalis.core.behavior.AttentionRules.suppressesFacing(false, false, true)
+                        && !com.linguauniversalis.core.behavior.AttentionRules.suppressesFacing(false, false, false),
+                "sleeping / dormant / defeated never actively face the player or any other creature");
+
+        // ---------------------------------------------------------------- 环境粒子（数据驱动）
+        check(com.linguauniversalis.core.behavior.AmbientParticleRules.specOf(nekoInv) == null,
+                "no ambient particle is configured for the cat girl yet (data-driven, opt-in)");
+        com.linguauniversalis.core.species.SpeciesProfile particleProbe =
+                com.linguauniversalis.core.species.SpeciesProfile.builder("smoke_particle_probe")
+                        .name("探针", "probe")
+                        .taxonomy(com.linguauniversalis.core.taxonomy.Taxonomy.Domain.MATERIAL,
+                                com.linguauniversalis.core.taxonomy.Taxonomy.Kingdom.CHORDATA,
+                                com.linguauniversalis.core.taxonomy.Taxonomy.MagicClassis.EXOSPIRA,
+                                com.linguauniversalis.core.taxonomy.Taxonomy.SocialOrdo.MIMETICUS,
+                                com.linguauniversalis.core.taxonomy.Taxonomy.ElementFamilia.UMBRA,
+                                com.linguauniversalis.core.taxonomy.Taxonomy.FormaSectio.PELLIS)
+                        .templateText(com.linguauniversalis.core.behavior.TemplateKeys.SPECIES_AMBIENT_PARTICLE,
+                                "minecraft:ash")
+                        .templateText(com.linguauniversalis.core.behavior.TemplateKeys
+                                .SPECIES_AMBIENT_PARTICLE_WHEN, "dormant")
+                        .templateParam(com.linguauniversalis.core.behavior.TemplateKeys
+                                .SPECIES_AMBIENT_PARTICLE_COUNT, 3)
+                        .build();
+        com.linguauniversalis.core.behavior.AmbientParticleRules.Spec probeSpec =
+                com.linguauniversalis.core.behavior.AmbientParticleRules.specOf(particleProbe);
+        check(probeSpec != null
+                        && "minecraft:ash".equals(probeSpec.particleId())
+                        && probeSpec.when() == com.linguauniversalis.core.behavior.AmbientParticleRules
+                                .ParticleState.DORMANT
+                        && probeSpec.count() == 3
+                        && probeSpec.intervalTicks()
+                                == com.linguauniversalis.core.behavior.AmbientParticleRules.DEFAULT_INTERVAL_TICKS
+                        && com.linguauniversalis.core.behavior.AmbientParticleRules.stateMatches(
+                                probeSpec.when(), true, false, false, false)
+                        && !com.linguauniversalis.core.behavior.AmbientParticleRules.stateMatches(
+                                probeSpec.when(), false, true, true, true),
+                "ambient particle spec is parsed from species variables and gated by state");
+
+        // ---------------------------------------------------------------- 变形形态注册表（可模块化）
+        check(com.linguauniversalis.core.species.DisguiseRegistry.contains(
+                                com.linguauniversalis.core.species.DisguiseRegistry.NEKOMATA_CAT)
+                        && !com.linguauniversalis.core.species.DisguiseRegistry
+                                .get(com.linguauniversalis.core.species.DisguiseRegistry.NEKOMATA_CAT).isGecko()
+                        && com.linguauniversalis.core.species.DisguiseRegistry.get("no_such_form") == null
+                        && com.linguauniversalis.core.behavior.DisguiseRules.formOf(nekoInv) != null
+                        && com.linguauniversalis.core.behavior.DisguiseRules.formOf(araInv) == null,
+                "disguise forms live in a registry: nekomata has one, arakne has none");
+        com.linguauniversalis.core.species.DisguiseForm geckoProbe =
+                new com.linguauniversalis.core.species.DisguiseForm("smoke_gecko_probe",
+                        com.linguauniversalis.core.species.DisguiseForm.KIND_GECKO,
+                        "smoke_cat", "lingua_universalis:textures/entity/smoke_cat.png", "",
+                        0.5, 0.8, 0.6);
+        check(geckoProbe.isGecko()
+                        && !com.linguauniversalis.core.species.DisguiseRegistry
+                                .get(com.linguauniversalis.core.species.DisguiseRegistry.NEKOMATA_CAT).isGecko()
+                        && geckoProbe.width() == 0.5 && geckoProbe.height() == 0.8 && geckoProbe.eyeHeight() == 0.6,
+                "a gecko disguise form is pure data (resource names + hitbox), no renderer code needed");
+
+        // ---------------------------------------------------------------- 睡眠（夜行性 + 体型 + 床/巢）
+        check(com.linguauniversalis.core.behavior.SleepRules.nocturnal(araInv)
+                        && com.linguauniversalis.core.behavior.SleepRules.nocturnal(nekoInv)
+                        && com.linguauniversalis.core.behavior.SleepRules.sizeOf(araInv)
+                                == com.linguauniversalis.core.behavior.SleepRules.SizeClass.LARGE
+                        && com.linguauniversalis.core.behavior.SleepRules.sizeOf(nekoInv)
+                                == com.linguauniversalis.core.behavior.SleepRules.SizeClass.MEDIUM,
+                "species tags: both are nocturnal; arakne is LARGE, nekomata is MEDIUM");
+        check(com.linguauniversalis.core.behavior.SleepRules.isSleepTime(1000L, true)
+                        && com.linguauniversalis.core.behavior.SleepRules.isSleepTime(13000L, false)
+                        && !com.linguauniversalis.core.behavior.SleepRules.isSleepTime(13000L, true)
+                        && !com.linguauniversalis.core.behavior.SleepRules.isSleepTime(1000L, false),
+                "nocturnal girls sleep during the day, diurnal ones at night");
+        check(com.linguauniversalis.core.behavior.SleepRules.bedMatchesSize(
+                                com.linguauniversalis.core.behavior.SleepRules.SizeClass.MEDIUM,
+                                com.linguauniversalis.core.behavior.SleepRules.SizeClass.MEDIUM)
+                        && !com.linguauniversalis.core.behavior.SleepRules.bedMatchesSize(
+                                com.linguauniversalis.core.behavior.SleepRules.SizeClass.MEDIUM,
+                                com.linguauniversalis.core.behavior.SleepRules.SizeClass.LARGE),
+                "a bed can only be used by a girl of the very same size class");
+        check(com.linguauniversalis.core.behavior.SleepRules.intent(true, true, false)
+                                == com.linguauniversalis.core.behavior.SleepRules.Intent.NEST
+                        && com.linguauniversalis.core.behavior.SleepRules.intent(true, false, true)
+                                == com.linguauniversalis.core.behavior.SleepRules.Intent.BED
+                        && com.linguauniversalis.core.behavior.SleepRules.intent(true, false, false)
+                                == com.linguauniversalis.core.behavior.SleepRules.Intent.NONE
+                        && com.linguauniversalis.core.behavior.SleepRules.intent(false, true, true)
+                                == com.linguauniversalis.core.behavior.SleepRules.Intent.NONE,
+                "sleep target: nest > matching bed (companions only) > wild without nest never sleeps");
+        check(Math.abs(com.linguauniversalis.core.behavior.SleepRules.NEST_SLEEP_RADIUS_BLOCKS - 3.0) < 1.0e-9
+                        && com.linguauniversalis.core.behavior.SleepRules.canSleepAtNest(9.0)
+                        && !com.linguauniversalis.core.behavior.SleepRules.canSleepAtNest(9.01)
+                        && com.linguauniversalis.core.behavior.SleepRules.canSleepOnBed(
+                                com.linguauniversalis.core.behavior.SleepRules.BED_REACH_BLOCKS
+                                        * com.linguauniversalis.core.behavior.SleepRules.BED_REACH_BLOCKS),
+                "she lies down within 3 blocks of the nest, and once she reaches the bed");
+        check(com.linguauniversalis.core.anim.AnimationRules.MAIN_SLEEP.equals("main_sleep")
+                        && com.linguauniversalis.core.anim.AnimationRules.mainAnimation(
+                                false, false, false, true, false, false)
+                                .equals(com.linguauniversalis.core.anim.AnimationRules.MAIN_SLEEP)
+                        && com.linguauniversalis.core.anim.AnimationRules.mainAnimation(
+                                true, false, false, true, false, false)
+                                .equals(com.linguauniversalis.core.anim.AnimationRules.MAIN_JUMP)
+                        && com.linguauniversalis.core.anim.AnimationRules.mainAnimation(
+                                false, false, false, false, true, false)
+                                .equals(com.linguauniversalis.core.anim.AnimationRules.MAIN_SIT),
+                "sleeping plays main_sleep (dormant/defeated), but a jump still wins");
+        check(com.linguauniversalis.core.anim.AnimationRules.mainAnimation(false, true, false, true, false, false)
+                        .equals(com.linguauniversalis.core.anim.AnimationRules.MAIN_SLEEP),
+                "sleep outranks airborne (a sleeping girl on a bed never flickers into main_airborne)");
+        check(Math.abs(com.linguauniversalis.core.behavior.SleepRules.BED_SURFACE_Y_OFFSET - 0.6875) < 1.0e-9,
+                "she is laid down at the same height vanilla uses (0.6875) so her feet rest on the bed");
+        // ---------------------------------------------------------------- 动画优先级 / 尾巴让位
+        check(com.linguauniversalis.core.anim.AnimationRules.shouldPlayTailSwing(false)
+                        && !com.linguauniversalis.core.anim.AnimationRules.shouldPlayTailSwing(true)
+                        && com.linguauniversalis.core.anim.AnimationRules.mainAnimation(
+                                false, false, false, true, false, false)
+                                .equals(com.linguauniversalis.core.anim.AnimationRules.MAIN_SLEEP),
+                "sleep outranks the tail overlay (no tail swing while asleep)");
+
+        // ---------------------------------------------------------------- 睡眠时段缓冲
+        check(com.linguauniversalis.core.behavior.SleepRules.SLEEP_WINDOW_MARGIN_TICKS == 1000L
+                        && !com.linguauniversalis.core.behavior.SleepRules.isSleepTime(500L, true)
+                        && com.linguauniversalis.core.behavior.SleepRules.isSleepTime(2000L, true)
+                        && !com.linguauniversalis.core.behavior.SleepRules.isSleepTime(11500L, true)
+                        && com.linguauniversalis.core.behavior.SleepRules.isSleepTime(10000L, true),
+                "sleep window keeps a 1000t buffer at both ends of day/night");
+
+        // ---------------------------------------------------------------- 床中心（两格交界）
+        double[] fromFoot = com.linguauniversalis.core.behavior.SleepRules.bedCenterOffset(false, 0, 1);
+        double[] fromHead = com.linguauniversalis.core.behavior.SleepRules.bedCenterOffset(true, 0, 1);
+        check(Math.abs(fromFoot[0]) < 1.0e-9 && Math.abs(fromFoot[1] - 0.5) < 1.0e-9
+                        && Math.abs(fromHead[0]) < 1.0e-9 && Math.abs(fromHead[1] + 0.5) < 1.0e-9,
+                "she lies down on the seam between the two bed blocks, not inside one half");
+
+        // ---------------------------------------------------------------- 好感粒子
+        check("minecraft:heart".equals(com.linguauniversalis.core.behavior.AffectionParticleRules
+                        .particleFor(10, 20))
+                        && "minecraft:angry_villager".equals(com.linguauniversalis.core.behavior
+                                .AffectionParticleRules.particleFor(20, 10))
+                        && com.linguauniversalis.core.behavior.AffectionParticleRules.particleFor(7, 7) == null,
+                "affection up = hearts, down = villager anger, unchanged = nothing");
+
+        // ---------------------------------------------------------------- 主动模式回防
+        check(Math.abs(com.linguauniversalis.core.behavior.CombatModeRules.OWNER_RETURN_RADIUS_BLOCKS - 24.0) < 1.0e-9
+                        && com.linguauniversalis.core.behavior.CombatModeRules.shouldReturnToOwner(
+                                com.linguauniversalis.core.behavior.CombatModeRules.CombatMode.AGGRESSIVE,
+                                true, true, 25.0 * 25.0)
+                        && !com.linguauniversalis.core.behavior.CombatModeRules.shouldReturnToOwner(
+                                com.linguauniversalis.core.behavior.CombatModeRules.CombatMode.AGGRESSIVE,
+                                true, true, 23.0 * 23.0)
+                        && !com.linguauniversalis.core.behavior.CombatModeRules.shouldReturnToOwner(
+                                com.linguauniversalis.core.behavior.CombatModeRules.CombatMode.PASSIVE,
+                                true, true, 40.0 * 40.0),
+                "aggressive girls give up the chase and walk home beyond 24 blocks (whistle stays 32)");
+
+        // ---------------------------------------------------------------- 图鉴条目模型
+        com.linguauniversalis.core.encyclopedia.Encyclopedia.PlayerEncyclopedia codex =
+                new com.linguauniversalis.core.encyclopedia.Encyclopedia.PlayerEncyclopedia();
+        codex.recordSighting(nekoInv.id());
+        java.util.List<com.linguauniversalis.core.encyclopedia.CodexEntry.Page> sightedPages =
+                com.linguauniversalis.core.encyclopedia.CodexEntry.documentOf(
+                        nekoInv, codex.knownKinds(nekoInv.id()));
+        boolean identityShown = false;
+        boolean taxonomyMasked = true;
+        for (com.linguauniversalis.core.encyclopedia.CodexEntry.Page page : sightedPages) {
+            for (com.linguauniversalis.core.encyclopedia.CodexEntry.Row row : page.rows()) {
+                if (page.section() == com.linguauniversalis.core.encyclopedia.CodexEntry.Section.IDENTITY
+                        && !row.locked()) {
+                    identityShown = true;
+                }
+                if (page.section() == com.linguauniversalis.core.encyclopedia.CodexEntry.Section.TAXONOMY
+                        && !row.locked()) {
+                    taxonomyMasked = false;
+                }
+            }
+        }
+        check(identityShown && taxonomyMasked,
+                "codex: sighting shows the identity page, taxonomy stays masked until observed");
+        codex.add(nekoInv.id(), com.linguauniversalis.core.encyclopedia.Encyclopedia.Kind.TAXONOMY);
+        codex.add(nekoInv.id(), com.linguauniversalis.core.encyclopedia.Encyclopedia.Kind.BASIC_INFO);
+        codex.add(nekoInv.id(), com.linguauniversalis.core.encyclopedia.Encyclopedia.Kind.HOSTILITY);
+        codex.add(nekoInv.id(), com.linguauniversalis.core.encyclopedia.Encyclopedia.Kind.PREFERENCES);
+        java.util.List<com.linguauniversalis.core.encyclopedia.CodexEntry.Page> fullPages =
+                com.linguauniversalis.core.encyclopedia.CodexEntry.documentOf(
+                        nekoInv, codex.knownKinds(nekoInv.id()));
+        int lockedRows = 0;
+        int totalRows = 0;
+        for (com.linguauniversalis.core.encyclopedia.CodexEntry.Page page : fullPages) {
+            for (com.linguauniversalis.core.encyclopedia.CodexEntry.Row row : page.rows()) {
+                totalRows++;
+                if (row.locked()) {
+                    lockedRows++;
+                }
+            }
+        }
+        check(fullPages.size() == com.linguauniversalis.core.encyclopedia.CodexEntry.Section.values().length
+                        && lockedRows == 0 && totalRows > 20,
+                "codex: every section is produced and fully unlocked rows carry real values");
+        // ---------------------------------------------------------------- 物品模型定义（26.2 必须有 items/<id>.json）
+        java.nio.file.Path itemModelsDir = java.nio.file.Path.of(
+                "src/main/resources/assets/lingua_universalis/models/item");
+        java.nio.file.Path itemDefsDir = java.nio.file.Path.of(
+                "src/main/resources/assets/lingua_universalis/items");
+        boolean defsComplete = true;
+        int defChecked = 0;
+        try (java.util.stream.Stream<java.nio.file.Path> models = java.nio.file.Files.list(itemModelsDir)) {
+            for (java.nio.file.Path model : models.toList()) {
+                String name = model.getFileName().toString().replace(".json", "");
+                if (!java.nio.file.Files.isRegularFile(itemDefsDir.resolve(name + ".json"))) {
+                    defsComplete = false;
+                    System.out.println("missing item model definition: " + name);
+                }
+                defChecked++;
+            }
+        } catch (java.io.IOException listingFailed) {
+            System.out.println("skip: item model folder not found (item definition cross-check)");
+        }
+        check(defChecked == 0 || defsComplete,
+                "every models/item entry has the 26.2 item model definition in assets/<ns>/items/");
+        // ---------------------------------------------------------------- 调试棒：强制状态循环
+        check(com.linguauniversalis.core.behavior.ForcedStateRules.next(
+                                com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState.NORMAL)
+                                == com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState.FORCED_NORMAL
+                        && com.linguauniversalis.core.behavior.ForcedStateRules.next(
+                                com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState.FORCED_NORMAL)
+                                == com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState.DORMANT
+                        && com.linguauniversalis.core.behavior.ForcedStateRules.next(
+                                com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState.DORMANT)
+                                == com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState.DOWNED
+                        && com.linguauniversalis.core.behavior.ForcedStateRules.next(
+                                com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState.DOWNED)
+                                == com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState.NORMAL,
+                "state stick cycles natural -> forced normal -> dormant -> defeated -> natural");
+        check(com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState.byId("dormant")
+                                == com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState.DORMANT
+                        && com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState.byId("bogus")
+                                == com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState.NORMAL
+                        && com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState.DOWNED.holdsDowned()
+                        && com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState.DORMANT.holdsDormant()
+                        && !com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState.NORMAL.holdsDormant(),
+                "forced state ids round-trip (unknown falls back to normal)");
+        check(com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState.values().length == 4
+                        && com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState.NORMAL.isNatural()
+                        && !com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState.FORCED_NORMAL.isNatural()
+                        && com.linguauniversalis.core.behavior.ForcedStateRules.next(
+                                com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState.FORCED_NORMAL)
+                                == com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState.DORMANT
+                        && com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState.byId("forced_normal")
+                                == com.linguauniversalis.core.behavior.ForcedStateRules.ForcedState.FORCED_NORMAL,
+                "state stick has 4 gears: natural (release) / forced normal / dormant / defeated");
+        // 猫系特性：只有猫又开；范围与标签约定
+        check(com.linguauniversalis.core.behavior.CatTraitRules.hasCatTraits(nekoInv)
+                        && !com.linguauniversalis.core.behavior.CatTraitRules.hasCatTraits(araInv)
+                        && Math.abs(com.linguauniversalis.core.behavior.CatTraitRules.SCARE_RADIUS_BLOCKS - 6.0) < 1.0e-9
+                        && com.linguauniversalis.core.behavior.CatTraitRules.withinScareRange(36.0)
+                        && !com.linguauniversalis.core.behavior.CatTraitRules.withinScareRange(36.01)
+                        && "lingua_universalis:scared_of_cats".equals(
+                                com.linguauniversalis.core.behavior.CatTraitRules.SCARED_OF_CATS_TAG)
+                        && Math.abs(com.linguauniversalis.core.behavior.CatTraitRules.PHANTOM_CAT_RADIUS_BLOCKS
+                                - 16.0) < 1.0e-9
+                        && com.linguauniversalis.core.behavior.CatTraitRules.PHANTOM_CAT_SEARCH_INTERVAL_TICKS == 20
+                        && com.linguauniversalis.core.behavior.CatTraitRules.withinPhantomCatRange(256.0)
+                        && !com.linguauniversalis.core.behavior.CatTraitRules.withinPhantomCatRange(256.01),
+                "cat traits: nekomata only; creepers avoid within 6 blocks (vanilla goal), phantoms give up within 16 blocks (vanilla rule)");
+        // ---------------------------------------------------------------- 玩家命令压过自主移动
+        check(com.linguauniversalis.core.behavior.CommandRules.blocksAutonomousMovement(
+                                com.linguauniversalis.core.behavior.CommandRules.CommandMode.STANDBY.englishId)
+                        && com.linguauniversalis.core.behavior.CommandRules.blocksAutonomousMovement(
+                                com.linguauniversalis.core.behavior.CommandRules.CommandMode.FOLLOW.englishId)
+                        && !com.linguauniversalis.core.behavior.CommandRules.blocksAutonomousMovement(
+                                com.linguauniversalis.core.behavior.CommandRules.CommandMode.WANDER.englishId),
+                "standby/follow outrank autonomous movement (sleep trips, chest errands); wander allows them");
+        // ---------------------------------------------------------------- 待命回位
+        check(com.linguauniversalis.core.behavior.CommandRules.shouldReturnToStandby(true, false, 4.0)
+                        && !com.linguauniversalis.core.behavior.CommandRules.shouldReturnToStandby(
+                                true, false, 2.0)
+                        && !com.linguauniversalis.core.behavior.CommandRules.shouldReturnToStandby(
+                                true, true, 100.0)
+                        && !com.linguauniversalis.core.behavior.CommandRules.shouldReturnToStandby(
+                                false, false, 100.0),
+                "standby: walk back beyond 1.5 blocks unless something more important is going on");
+
+        // ---------------------------------------------------------------- 击倒播报语言键
+        java.nio.file.Path zhLang = java.nio.file.Path.of(
+                "src/main/resources/assets/lingua_universalis/lang/zh_cn.json");
+        java.nio.file.Path enLang = java.nio.file.Path.of(
+                "src/main/resources/assets/lingua_universalis/lang/en_us.json");
+        boolean knockdownKeyPresent = false;
+        try {
+            knockdownKeyPresent = new String(java.nio.file.Files.readAllBytes(zhLang),
+                    java.nio.charset.StandardCharsets.UTF_8).contains("death.lingua_universalis.knockdown")
+                    && new String(java.nio.file.Files.readAllBytes(enLang),
+                    java.nio.charset.StandardCharsets.UTF_8).contains("death.lingua_universalis.knockdown");
+        } catch (java.io.IOException ignored) {
+            System.out.println("skip: lang files not found (knockdown message check)");
+            knockdownKeyPresent = true;
+        }
+        check(knockdownKeyPresent, "companion knockdown message has both zh_cn and en_us translations");
         System.out.println(fails == 0 ? "ALL_PASS" : ("FAILURES=" + fails));
         if (fails > 0) {
             System.exit(1);
         }
+    }
+
+    /**
+     * 从 geckolib 模型 JSON 里取某根骨骼的父骨骼名。
+     *
+     * <p>只对"没有嵌套对象"的骨骼有效（定位组骨骼正好只有 name/parent/pivot），
+     * 够用且不必为冒烟测试引入 JSON 库。找不到返回 {@code null}。
+     */
+    private static String boneParentOf(String modelJson, String boneName) {
+        if (modelJson == null || boneName == null) {
+            return null;
+        }
+        java.util.regex.Matcher object = java.util.regex.Pattern.compile(
+                        "\\{[^{}]*\"name\"\\s*:\\s*\"" + java.util.regex.Pattern.quote(boneName) + "\"[^{}]*\\}")
+                .matcher(modelJson);
+        while (object.find()) {
+            java.util.regex.Matcher parent =
+                    java.util.regex.Pattern.compile("\"parent\"\\s*:\\s*\"([^\"]+)\"").matcher(object.group());
+            if (parent.find()) {
+                return parent.group(1);
+            }
+        }
+        return null;
     }
 }

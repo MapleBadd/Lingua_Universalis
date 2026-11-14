@@ -102,6 +102,9 @@ public final class ModConstants {
     public static final long HOSTILE_SCAN_EVERY_TICKS = 10L;
     /** 近战攻击间隔（tick，约 1 秒一刀）。 */
     public static final long MELEE_COOLDOWN_TICKS = 20L;
+
+    /** 主动模式下"帮主人打架"的协助距离（格）：超出这个距离就不追主人的战斗。 */
+    public static final double ASSIST_RANGE_BLOCKS = 32.0;
     /** 近战攻击判定距离（方块）。 */
     public static final double MELEE_REACH_BLOCKS = 2.4;
     /** 受击反击记忆窗口（tick，5 秒）。 */

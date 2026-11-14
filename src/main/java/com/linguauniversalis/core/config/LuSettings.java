@@ -29,7 +29,8 @@ import java.util.TreeMap;
  *
  * <p>可调组：{@code headLook.*}、{@code animation.speed.*} / {@code animation.mainTransitionTicks} /
  * {@code animation.freezePawTransition}、{@code model.renderScale}、
- * {@code body.width|height|eyeHeight}（不写则用物种档案值）。
+ * {@code body.width|height|eyeHeight}（不写则用物种档案值）、
+ * {@code heldItem.scale|offsetX|offsetY|offsetZ|rotX|rotY|rotZ}（手上物品在爪部定位组上的表现）。
  */
 public final class LuSettings {
     // ---------------------------------------------------------------- 键名
@@ -39,9 +40,16 @@ public final class LuSettings {
     public static final String KEY_HEAD_LOOK_YAW_AXIS = "headLook.yawAxis";
     public static final String KEY_HEAD_LOOK_PITCH_AXIS = "headLook.pitchAxis";
     public static final String KEY_HEAD_LOOK_FOLLOW_PITCH = "headLook.followPitch";
-    public static final String KEY_LOOK_AT_NEARBY_PLAYER = "headLook.lookAtNearbyPlayer";
     public static final String KEY_HEAD_LOOK_MAX_YAW = "headLook.maxYawDeg";
     public static final String KEY_HEAD_LOOK_MAX_PITCH = "headLook.maxPitchDeg";
+    /**
+     * 转头是否"按世界轴补偿父骨骼倾斜"（默认 true）。
+     *
+     * <p>坐姿等动画会把 {@code All}/{@code TopBody} 甚至 {@code AllHead} 本身转起来，
+     * 此时在骨骼本地轴上做水平转头会带出歪头分量；开启后按父链累计旋转做补偿，
+     * 转头始终绕"世界竖轴"（关掉则退回旧的"直接叠加到本地轴"）。
+     */
+    public static final String KEY_HEAD_LOOK_COMPENSATE_POSE = "headLook.compensatePose";
     public static final String KEY_MAIN_TRANSITION_TICKS = "animation.mainTransitionTicks";
     public static final String KEY_JUMP_TRANSITION_TICKS = "animation.jumpTransitionTicks";
     public static final String KEY_WALK_ANIMATION_SPEED = "animation.walkSpeed";
@@ -54,6 +62,16 @@ public final class LuSettings {
     public static final String KEY_SPEED_WALK_SCALE = "speed.walkScale";
     /** 可选：最快档倍率覆盖（不写则用物种档案值）。 */
     public static final String KEY_SPEED_FAST_SCALE = "speed.fastScale";
+    /** 手持物品缩放（渲染在爪部定位组上；1.0 = 物品模型原尺寸）。 */
+    public static final String KEY_HELD_ITEM_SCALE = "heldItem.scale";
+    /** 手持物品相对定位组的偏移（格）。 */
+    public static final String KEY_HELD_ITEM_OFFSET_X = "heldItem.offsetX";
+    public static final String KEY_HELD_ITEM_OFFSET_Y = "heldItem.offsetY";
+    public static final String KEY_HELD_ITEM_OFFSET_Z = "heldItem.offsetZ";
+    /** 手持物品旋转（度，按 X→Y→Z 顺序）。 */
+    public static final String KEY_HELD_ITEM_ROT_X = "heldItem.rotX";
+    public static final String KEY_HELD_ITEM_ROT_Y = "heldItem.rotY";
+    public static final String KEY_HELD_ITEM_ROT_Z = "heldItem.rotZ";
     public static final String ANIMATION_SPEED_PREFIX = "animation.speed.";
 
     /** 会写进默认配置文件的动画名（与动画资源一致；冒烟测试对表）。 */
@@ -67,10 +85,12 @@ public final class LuSettings {
     public static final boolean DEFAULT_HEAD_LOOK_ENABLED = true;
     public static final double DEFAULT_HEAD_LOOK_YAW_SIGN = -1.0;
     public static final double DEFAULT_HEAD_LOOK_PITCH_SIGN = -1.0;
+    /** 左右转头的旋转轴（默认 z，可在配置里按物种改）；俯仰用 X。 */
     public static final String DEFAULT_HEAD_LOOK_YAW_AXIS = "z";
     public static final String DEFAULT_HEAD_LOOK_PITCH_AXIS = "x";
     public static final boolean DEFAULT_HEAD_LOOK_FOLLOW_PITCH = true;
-    public static final boolean DEFAULT_LOOK_AT_NEARBY_PLAYER = true;
+    /** 默认按世界轴补偿：坐着/悬空等"父骨骼倾斜"的姿态下也不会歪头。 */
+    public static final boolean DEFAULT_HEAD_LOOK_COMPENSATE_POSE = true;
     public static final double DEFAULT_HEAD_LOOK_MAX_YAW = 75.0;
     public static final double DEFAULT_HEAD_LOOK_MAX_PITCH = 60.0;
     /** 主要动画自动过渡时长（tick）：越大越柔和；0 = 不做过渡。 */
@@ -88,6 +108,8 @@ public final class LuSettings {
     public static final double DEFAULT_BODY_WIDTH = 0.6;
     public static final double DEFAULT_BODY_HEIGHT = 1.8;
     public static final double DEFAULT_BODY_EYE_HEIGHT = 1.62;
+    /** 手持物品缩放：定位组上是"物品模型原尺寸"，0.55 约等于握在爪里的比例。 */
+    public static final double DEFAULT_HELD_ITEM_SCALE = 0.55;
 
     private static final Map<String, String> DEFAULTS = new LinkedHashMap<>();
     private static final List<String> COMMENTS = new ArrayList<>();
@@ -109,15 +131,21 @@ public final class LuSettings {
         COMMENTS.add("# headLook.*：头部跟随视角（只影响 AllHead 的旋转，不影响位置/缩放）");
         COMMENTS.add("#   yawAxis / pitchAxis：作用到骨骼的哪根轴（x / y / z），按模型实际表现试");
         COMMENTS.add("#   yawSign / pitchSign：方向反了改成 -1（正负一）");
-        COMMENTS.add("#   followPitch：false = 只跟随左右转头；lookAtNearbyPlayer：没绑定时也注视附近玩家");
+        COMMENTS.add("#   followPitch：false = 只跟随左右转头");
         COMMENTS.add("#   maxYawDeg / maxPitchDeg：限幅（度）");
+        COMMENTS.add("#   compensatePose：true = 按世界竖轴转头（坐姿等父骨骼倾斜的姿态不会歪头）；false = 旧行为");
         COMMENTS.add("# animation.speed.<动画名>：每个动画的播放倍速（1.0 = 原速，默认全部 1.0）");
         COMMENTS.add("# animation.mainTransitionTicks：主要动画自动过渡时长（tick）；0 = 不做过渡，越大越柔和");
         COMMENTS.add("# animation.freezePawTransition：true = LeftPaw/RightPaw 不参与自动过渡");
         COMMENTS.add("#   （GeckoLib 过渡按关键帧数值线性插值、不做最短弧，脚掌会绕远路反向转 180 度以上）");
         COMMENTS.add("# model.renderScale：模型渲染缩放（1.0 = 原尺寸）");
+        COMMENTS.add("# heldItem.*：手上物品在爪部定位组上的表现（只影响手上物品，不影响身体）");
+        COMMENTS.add("#   定位组 = 挂在 RightPaw / LeftPaw 下、名字里带 Locator 的空骨骼（美术资源里定位置）");
+        COMMENTS.add("#   scale：物品缩放（1.0 = 物品模型原尺寸，默认 0.55 像握在爪里）");
+        COMMENTS.add("#   offsetX/Y/Z：相对定位组的位移（格）");
+        COMMENTS.add("#   rotX/rotY/rotZ：旋转（度，按 X→Y→Z 顺序）——物品方向不对时先试 rotX=90 / rotZ=90");
         COMMENTS.add("# body.width / body.height / body.eyeHeight：碰撞箱与视线高度（格），");
-        COMMENTS.add("#   不写则用物种档案里的值（猫又 = 0.6 / 1.5 / 2.1548）");
+        COMMENTS.add("#   不写则用物种档案里的值（猫又 = 0.6 / 1.5 / 2.217276；视线高度 = 模型 EyesLocator 枢轴 ÷ 16）");
         COMMENTS.add("# speed.walkScale / speed.fastScale：移动速度倍率（最终速度 = 0.25 格/tick × 倍率），");
         COMMENTS.add("#   不写则用物种档案里的值（猫又 = 1.0 / 1.7），≤0 视为不写；");
         COMMENTS.add("#   跟随玩家超过 8 格、或正在攻击敌人时用 fast，其余用 walk");
@@ -128,13 +156,20 @@ public final class LuSettings {
         DEFAULTS.put(KEY_HEAD_LOOK_YAW_AXIS, DEFAULT_HEAD_LOOK_YAW_AXIS);
         DEFAULTS.put(KEY_HEAD_LOOK_PITCH_AXIS, DEFAULT_HEAD_LOOK_PITCH_AXIS);
         DEFAULTS.put(KEY_HEAD_LOOK_FOLLOW_PITCH, Boolean.toString(DEFAULT_HEAD_LOOK_FOLLOW_PITCH));
-        DEFAULTS.put(KEY_LOOK_AT_NEARBY_PLAYER, Boolean.toString(DEFAULT_LOOK_AT_NEARBY_PLAYER));
+        DEFAULTS.put(KEY_HEAD_LOOK_COMPENSATE_POSE, Boolean.toString(DEFAULT_HEAD_LOOK_COMPENSATE_POSE));
         DEFAULTS.put(KEY_HEAD_LOOK_MAX_YAW, trim(DEFAULT_HEAD_LOOK_MAX_YAW));
         DEFAULTS.put(KEY_HEAD_LOOK_MAX_PITCH, trim(DEFAULT_HEAD_LOOK_MAX_PITCH));
         DEFAULTS.put(KEY_MAIN_TRANSITION_TICKS, Integer.toString(DEFAULT_MAIN_TRANSITION_TICKS));
         DEFAULTS.put(KEY_JUMP_TRANSITION_TICKS, Integer.toString(DEFAULT_JUMP_TRANSITION_TICKS));
         DEFAULTS.put(KEY_FREEZE_PAW_TRANSITION, Boolean.toString(DEFAULT_FREEZE_PAW_TRANSITION));
         DEFAULTS.put(KEY_MODEL_RENDER_SCALE, trim(DEFAULT_MODEL_RENDER_SCALE));
+        DEFAULTS.put(KEY_HELD_ITEM_SCALE, trim(DEFAULT_HELD_ITEM_SCALE));
+        DEFAULTS.put(KEY_HELD_ITEM_OFFSET_X, "0");
+        DEFAULTS.put(KEY_HELD_ITEM_OFFSET_Y, "0");
+        DEFAULTS.put(KEY_HELD_ITEM_OFFSET_Z, "0");
+        DEFAULTS.put(KEY_HELD_ITEM_ROT_X, "0");
+        DEFAULTS.put(KEY_HELD_ITEM_ROT_Y, "0");
+        DEFAULTS.put(KEY_HELD_ITEM_ROT_Z, "0");
         for (String animation : TUNING_ANIMATION_NAMES) {
             DEFAULTS.put(ANIMATION_SPEED_PREFIX + animation, trim(defaultSpeedOf(animation)));
         }
@@ -366,12 +401,13 @@ public final class LuSettings {
         return sign(speciesId, KEY_HEAD_LOOK_PITCH_SIGN, DEFAULT_HEAD_LOOK_PITCH_SIGN);
     }
 
-    public boolean headLookFollowPitch(String speciesId) {
-        return bool(speciesId, KEY_HEAD_LOOK_FOLLOW_PITCH, DEFAULT_HEAD_LOOK_FOLLOW_PITCH);
+    /** 转头是否按世界轴补偿父骨骼倾斜（默认 true；false = 旧的"直接叠加本地轴"）。 */
+    public boolean headLookCompensatePose(String speciesId) {
+        return bool(speciesId, KEY_HEAD_LOOK_COMPENSATE_POSE, DEFAULT_HEAD_LOOK_COMPENSATE_POSE);
     }
 
-    public boolean lookAtNearbyPlayer(String speciesId) {
-        return bool(speciesId, KEY_LOOK_AT_NEARBY_PLAYER, DEFAULT_LOOK_AT_NEARBY_PLAYER);
+    public boolean headLookFollowPitch(String speciesId) {
+        return bool(speciesId, KEY_HEAD_LOOK_FOLLOW_PITCH, DEFAULT_HEAD_LOOK_FOLLOW_PITCH);
     }
 
     public double headLookMaxYawDeg(String speciesId) {
@@ -454,6 +490,36 @@ public final class LuSettings {
         return number(speciesId, KEY_SPEED_WALK_SCALE, -1.0);
     }
 
+    // ---------------------------------------------------------------- 手上物品（定位组渲染）
+    /** 手上物品缩放（≤0 视为未配置，回落到默认值）。 */
+    public double heldItemScale(String speciesId) {
+        return positive(speciesId, KEY_HELD_ITEM_SCALE, DEFAULT_HELD_ITEM_SCALE);
+    }
+
+    public double heldItemOffsetX(String speciesId) {
+        return number(speciesId, KEY_HELD_ITEM_OFFSET_X, 0.0);
+    }
+
+    public double heldItemOffsetY(String speciesId) {
+        return number(speciesId, KEY_HELD_ITEM_OFFSET_Y, 0.0);
+    }
+
+    public double heldItemOffsetZ(String speciesId) {
+        return number(speciesId, KEY_HELD_ITEM_OFFSET_Z, 0.0);
+    }
+
+    public double heldItemRotXDeg(String speciesId) {
+        return number(speciesId, KEY_HELD_ITEM_ROT_X, 0.0);
+    }
+
+    public double heldItemRotYDeg(String speciesId) {
+        return number(speciesId, KEY_HELD_ITEM_ROT_Y, 0.0);
+    }
+
+    public double heldItemRotZDeg(String speciesId) {
+        return number(speciesId, KEY_HELD_ITEM_ROT_Z, 0.0);
+    }
+
     /** 最快速度倍率覆盖；小于等于 0 表示未配置（用物种档案值）。 */
     public double speedFastScale(String speciesId) {
         return number(speciesId, KEY_SPEED_FAST_SCALE, -1.0);
@@ -484,8 +550,8 @@ public final class LuSettings {
         return headLookFollowPitch(null);
     }
 
-    public boolean lookAtNearbyPlayer() {
-        return lookAtNearbyPlayer(null);
+    public boolean headLookCompensatePose() {
+        return headLookCompensatePose(null);
     }
 
     public double headLookMaxYawDeg() {

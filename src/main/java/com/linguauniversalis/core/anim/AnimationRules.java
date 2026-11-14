@@ -16,6 +16,32 @@ package com.linguauniversalis.core.anim;
  * </ul>
  */
 public final class AnimationRules {
+    /*
+     * ============================ 动画优先级总表（两层结构） ============================
+     *
+     * GeckoLib 侧机制：控制器按**注册顺序**叠加，后注册的后写 ⇒ 覆盖先注册的骨骼数值。
+     * 因此优先级 = 注册顺序的倒序。
+     *
+     * 【第一层：主要动画 main（互斥，同一时刻只有一个）】自高到低：
+     *   1. main_jump      主动跳跃（播完一遍，末帧停住 → 转 airborne）
+     *   2. main_sleep     睡眠 / 休眠 / 战败倒地（三者共用这一段动画）
+     *   3. main_airborne  悬空
+     *   4. main_eat       进食
+     *   5. main_sit       静坐（待机命令）
+     *   6. main_walk      移动
+     *   7. main_idle      其余情况
+     *
+     * 【第二层：叠加动画（各自独立、可并行，后注册覆盖先注册）】自低到高：
+     *   1. constant        常驻基底（只补主要动画没动的骨骼）
+     *   2. main            ← 主要动画在这一层写入主体姿态
+     *   3. tail_swing      尾巴摆动：覆盖主要动画的尾巴骨骼，**但睡眠时让位**（见 shouldPlayTailSwing）
+     *   4. random_blink*   随机眨眼
+     *   5. random_idle*    随机小动作
+     *   6. pet             摸头（触发式一次性，优先级最高）
+     *
+     * 也就是说：**睡眠 > 尾巴 > 其余主要动画**；摸头/眨眼这类表情动画永远在最上面。
+     * ================================================================================
+     */
     private AnimationRules() {
     }
 
@@ -26,13 +52,20 @@ public final class AnimationRules {
     public static final String MAIN_AIRBORNE = "main_airborne";
     public static final String MAIN_EAT = "main_eat";
     public static final String MAIN_SIT = "main_sit";
+    /** 睡觉（休眠 / 战败 / 睡在床上都先用它顶着）。 */
+    public static final String MAIN_SLEEP = "main_sleep";
     /** 未启用（占位）：猫又的 playing1 / hiss1。 */
     public static final String MAIN_PLAYING1 = "main_playing1";
     public static final String MAIN_HISS1 = "main_hiss1";
 
     /** 常驻混合动画（一直在播）。 */
     public static final String BLEND_CONSTANT = "constant";
-    /** 尾巴混合动画（按心情/状态常驻；目前只有 swing）。 */
+    /**
+     * 尾巴混合动画（按心情/状态常驻；目前只有 swing）。
+     *
+     * <p>优先级：**睡眠 &gt; 尾巴 &gt; 其他主要动画** —— 她睡着时尾巴跟着睡姿走（不摆动），
+     * 醒着时尾巴在走路/进食/待机之上持续摆动（见 {@link #shouldPlayTailSwing}）。
+     */
     public static final String BLEND_TAIL_SWING = "tail_swing";
     /** 摸头触发的混合动画。 */
     public static final String BLEND_PET = "pet";
@@ -50,7 +83,7 @@ public final class AnimationRules {
      * <p>新增/改名动画时同步这里与 {@code geckolib/animations/<species>.animation.json}。
      */
     public static final String[] REQUIRED_ANIMATIONS = {
-            MAIN_IDLE, MAIN_WALK, MAIN_JUMP, MAIN_AIRBORNE, MAIN_EAT, MAIN_SIT,
+            MAIN_IDLE, MAIN_WALK, MAIN_JUMP, MAIN_AIRBORNE, MAIN_EAT, MAIN_SIT, MAIN_SLEEP,
             MAIN_PLAYING1, MAIN_HISS1,
             BLEND_CONSTANT, BLEND_TAIL_SWING, BLEND_PET,
             RANDOM_BLINK, RANDOM_IDLE,
@@ -78,15 +111,20 @@ public final class AnimationRules {
      *   <li>{@code main_jump}（主动跳跃播一遍，末帧停住 → 播完自然转 airborne）；</li>
      *   <li>{@code main_airborne}（非飞行/游泳时悬空，优先级高于 walk/run/sprint，避免空中穿帮）；</li>
      *   <li>{@code main_eat}（进食）；</li>
-     *   <li>{@code main_sit}（休眠/静坐）；</li>
+     *   <li>{@code main_sleep}（休眠 / 战败 / 睡在床上）；</li>
+     *   <li>{@code main_sit}（静坐）；</li>
      *   <li>{@code main_walk}（移动；游泳/潜行暂时也用它）；</li>
      *   <li>{@code main_idle}（其余情况）。</li>
      * </ol>
      */
     public static String mainAnimation(boolean jumpAnimActive, boolean airborne, boolean eating,
-                                       boolean sitting, boolean moving) {
+                                       boolean sleeping, boolean sitting, boolean moving) {
         if (jumpAnimActive) {
             return MAIN_JUMP;
+        }
+        if (sleeping) {
+            // 睡眠优先于悬空：贴着床面/巢穴时的"离地抖动"不该把 sleep 动画抢掉
+            return MAIN_SLEEP;
         }
         if (airborne) {
             return MAIN_AIRBORNE;
@@ -101,6 +139,13 @@ public final class AnimationRules {
             return MAIN_WALK;
         }
         return MAIN_IDLE;
+    }
+
+    /**
+     * 尾巴摆动是否继续播放：睡着时让位给 {@link #MAIN_SLEEP}（睡姿接管尾巴骨骼）。
+     */
+    public static boolean shouldPlayTailSwing(boolean sleeping) {
+        return !sleeping;
     }
 
     /**
@@ -153,7 +198,7 @@ public final class AnimationRules {
      * 是否处于"主动跳跃"（用于播一遍 {@code main_jump}）。
      *
      * <p>不要只看 {@code isJumping()}：那是 AI 通过 {@code JumpControl} 请求跳跃的标记，
-     * 而本模组脊索界自带"自动踏上 1 格"，寻路时常常直接走上去不请求跳跃，
+     * 而本模组脊索自带"自动踏上 1 格"，寻路时常常直接走上去不请求跳跃，
      * 于是 {@code isJumping()} 常年为 false、跳跃动画永不触发。
      * 这里改为"离地 + 正在向上运动"来判定（被动掉落是向下运动，不会被误判）。
      */

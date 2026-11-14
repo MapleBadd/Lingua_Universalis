@@ -48,7 +48,7 @@ public class CompanionChestMenu extends AbstractContainerMenu {
     /** 客户端：从缓冲解出方块坐标，再取本地那份方块实体。 */
     public static CompanionChestMenu fromNetwork(int containerId, Inventory playerInventory,
             RegistryFriendlyByteBuf buf) {
-        BlockPos pos = buf.readBlockPos();
+        BlockPos pos = buf == null ? BlockPos.ZERO : buf.readBlockPos();
         Container container = playerInventory.player.level().getBlockEntity(pos)
                 instanceof CompanionChestBlockEntity chest
                         ? chest

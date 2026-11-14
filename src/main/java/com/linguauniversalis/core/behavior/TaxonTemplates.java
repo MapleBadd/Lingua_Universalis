@@ -153,7 +153,7 @@ public final class TaxonTemplates {
         register(Taxonomy.FormaSectio.MYCETA, TaxonTemplates.builder()
                 .flag(TemplateKeys.FLAG_SECTIO_AREA_EFFECT, true));
 
-        // 目（Familia）：幽暗目 —— 视野内出现亡灵每天一次 +1 心情（猫又等）
+        // 目（Familia）：幽暗 —— 视野内出现亡灵每天一次 +1 心情（猫又等）
         register(Taxonomy.ElementFamilia.UMBRA, TaxonTemplates.builder()
                 .flag(TemplateKeys.FLAG_FAMILIA_UNDEAD_SIGHT_MOOD, true));
 

@@ -34,6 +34,20 @@ public final class DisguiseRules {
         return profile.templateFlag(TemplateKeys.FLAG_SPECIES_DISGUISE, false);
     }
 
+    /**
+     * 该物种的伪装形态定义（{@link com.linguauniversalis.core.species.DisguiseRegistry}）。
+     *
+     * <p>没开伪装、或形态 id 没登记时返回 {@code null} —— 实体侧把这当作"没有变形"，
+     * 不会崩也不会乱画。变形因此是**通用玩法**：新物种丢资源 + 登记形态 + 档案指过去即可。
+     */
+    public static com.linguauniversalis.core.species.DisguiseForm formOf(SpeciesProfile profile) {
+        if (!hasDisguise(profile)) {
+            return null;
+        }
+        return com.linguauniversalis.core.species.DisguiseRegistry.get(
+                profile.templateString(TemplateKeys.SPECIES_DISGUISE_FORM, ""));
+    }
+
     /** 人形"无事"多久后恢复伪装（tick；默认 1200 = 60 秒，至少 1）。 */
     public static long revertTicks(SpeciesProfile profile) {
         return Math.max(1L, (long) profile.templateParam(TemplateKeys.SPECIES_DISGUISE_REVERT_TICKS, 1200.0));

@@ -1,3 +1,6 @@
 {
-    "parent":  "lingua_universalis:block/spina_florens"
+    "textures":  {
+                     "layer0":  "lingua_universalis:item/spina_florens"
+                 },
+    "parent":  "minecraft:item/generated"
 }

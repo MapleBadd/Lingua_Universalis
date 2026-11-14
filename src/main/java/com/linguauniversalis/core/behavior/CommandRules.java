@@ -45,4 +45,35 @@ public final class CommandRules {
     public static boolean isInsubordinate(MonsterGirlState state) {
         return state.isDepressed() || state.dormant();
     }
+
+    /**
+     * 玩家命令是否<b>压过"会移动的自主行为"</b>（去床上睡、去伙伴宝箱跑腿）。
+     *
+     * <p>优先级口径（玩家命令优先）：
+     * <ul>
+     *   <li>{@link CommandMode#STANDBY 待机}：站定不动 —— 不再自己走去睡觉、不再自己去箱子存取；</li>
+     *   <li>{@link CommandMode#FOLLOW 跟随}：跟着主人走（睡觉/跑腿同样让位）；</li>
+     *   <li>{@link CommandMode#WANDER 游荡}：允许自主活动，睡眠/跑腿照常生效。</li>
+     * </ul>
+     * <b>例外</b>（这些不算"自主移动"，仍照常执行）：原地进食、被攻击后自卫/反击、倒地、休眠。
+     */
+    public static boolean blocksAutonomousMovement(String obeyModeId) {
+        return CommandMode.STANDBY.englishId.equals(obeyModeId)
+                || CommandMode.FOLLOW.englishId.equals(obeyModeId);
+    }
+
+    /** 待命回位容差（格）：离待命点超过它才走回去，避免原地抖动。 */
+    public static final double STANDBY_RETURN_RADIUS_BLOCKS = 1.5;
+
+    /**
+     * 待命时是否该走回待命点。
+     *
+     * @param standbyMode 当前是否为"待机"命令
+     * @param blocked     是否有更优先的事情（战斗/取食/进食/倒地/休眠/睡觉）
+     * @param distSq      到待命点的平方距离
+     */
+    public static boolean shouldReturnToStandby(boolean standbyMode, boolean blocked, double distSq) {
+        return standbyMode && !blocked
+                && distSq > STANDBY_RETURN_RADIUS_BLOCKS * STANDBY_RETURN_RADIUS_BLOCKS;
+    }
 }

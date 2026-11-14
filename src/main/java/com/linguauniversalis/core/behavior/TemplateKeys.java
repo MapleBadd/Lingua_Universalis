@@ -67,7 +67,7 @@ public final class TemplateKeys {
     /** 暗影箭最小距离（格；更近则改用近战）。 */
     public static final String ABILITY_SHADOW_BOLT_MIN_RANGE = "ability.shadowBolt.minRange";
 
-    /** 流血（绒科）：命中刷新时长 tick。 */
+    /** 流血（绒）：命中刷新时长 tick。 */
     public static final String ABILITY_BLEED_REFRESH_TICKS = "ability.bleed.refreshTicks";
     /** 流血结算间隔 tick（每间隔造成一次等于层级的物理伤害）。 */
     public static final String ABILITY_BLEED_TICK_INTERVAL_TICKS = "ability.bleed.tickIntervalTicks";
@@ -82,6 +82,59 @@ public final class TemplateKeys {
     public static final String FLAG_SPECIES_DISGUISE = "species.disguise";
     /** 人形状态"无事"多久后恢复伪装形态（tick；默认 1200 = 60 秒）。 */
     public static final String SPECIES_DISGUISE_REVERT_TICKS = "species.disguiseRevertTicks";
+    /**
+     * 【物种变量·文本】伪装形态 id（指向 {@code core/species/DisguiseRegistry} 里登记的形态）。
+     *
+     * <p>变形是通用玩法：新物种只要做一份第二形态资源、在注册表登记一条
+     * {@code DisguiseForm}、再用本键指过去，就自动获得"野生伪装 → 现形 → 静默后恢复"
+     * 全套流程，无需改实体/渲染器代码。猫又 = {@code nekomata_cat}（原版猫渲染）。
+     */
+    public static final String SPECIES_DISGUISE_FORM = "species.disguiseForm";
+
+    // ------------------------------------------------------------------ 物种·猫系特性
+    /**
+     * 【物种变量·开关】是否具备<b>猫系特性</b>：把附近的苦力怕/幻翼（以及被数据包标进
+     * {@code #lingua_universalis:scared_of_cats} 的生物）赶走。猫又 = true。
+     *
+     * <p>规则见 {@code core/behavior/CatTraitRules}。
+     */
+    /**
+     * 【物种变量】是否在**图鉴里隐藏**（true = 不显示在图鉴目录里）。
+     *
+     * <p>用于"游戏内已经存在、但暂时不想让玩家读到档案"的物种（例如美术还没做好的阿拉克涅）。
+     * 只影响图鉴显示，不影响生成/交互/存档。
+     */
+    public static final String FLAG_SPECIES_HIDE_IN_CODEX = "species.hideInCodex";
+
+    public static final String FLAG_SPECIES_CAT_TRAITS = "species.catTraits";
+
+    // ------------------------------------------------------------------ 物种·睡眠习性
+    /**
+     * 【物种变量·开关】是否<b>夜行性</b>：夜行性 = 白天睡觉、夜里活动；否则反之。
+     *
+     * <p>决定了"什么时候主动睡觉"（见 {@code core/behavior/SleepRules}）。
+     */
+    public static final String FLAG_SPECIES_NOCTURNAL = "species.nocturnal";
+    /**
+     * 【物种变量·数值】体型档：0=小、1=中、2=大、3=超大。
+     *
+     * <p>决定她能睡哪种魔物床（床与体型必须一致：中魔物床 ↔ 中型魔物娘）。
+     */
+    public static final String SPECIES_SIZE_CLASS = "species.sizeClass";
+
+    // ------------------------------------------------------------------ 物种·环境粒子（数据驱动的粒子发射器）
+    /** 【物种变量·文本】环境粒子 id（如 {@code minecraft:ash}）；不写 = 不放粒子。 */
+    public static final String SPECIES_AMBIENT_PARTICLE = "species.ambientParticle";
+    /** 粒子触发状态：always / dormant / downed / depressed / aggressive（默认 always）。 */
+    public static final String SPECIES_AMBIENT_PARTICLE_WHEN = "species.ambientParticle.when";
+    /** 粒子发射间隔 tick（默认 20 = 每秒一次）。 */
+    public static final String SPECIES_AMBIENT_PARTICLE_INTERVAL_TICKS = "species.ambientParticle.intervalTicks";
+    /** 每次发射颗数（默认 1）。 */
+    public static final String SPECIES_AMBIENT_PARTICLE_COUNT = "species.ambientParticle.count";
+    /** 水平散布半径（格，默认 0.5）。 */
+    public static final String SPECIES_AMBIENT_PARTICLE_RADIUS = "species.ambientParticle.radius";
+    /** 出生高度偏移（格，默认 1.0）。 */
+    public static final String SPECIES_AMBIENT_PARTICLE_Y_OFFSET = "species.ambientParticle.yOffset";
 
     // ------------------------------------------------------------------ 物种·社交习性（设计 §12 猫又）
     /** 是否会偷鱼（物种变量；仅游荡状态触发）。 */
@@ -90,7 +143,7 @@ public final class TemplateKeys {
     public static final String SPECIES_FISH_STEAL_INTERVAL_TICKS = "species.fishStealIntervalTicks";
     /** 是否会偷村民绿宝石（物种变量；每天 50%、1–3 颗）。 */
     public static final String FLAG_SPECIES_STEALS_EMERALDS = "species.stealsEmeralds";
-    /** 目·亡灵视野：视野内出现亡灵每天一次 +1 心情（幽暗目默认 true）。 */
+    /** 目·亡灵视野：视野内出现亡灵每天一次 +1 心情（幽暗默认 true）。 */
     public static final String FLAG_FAMILIA_UNDEAD_SIGHT_MOOD = "familia.undeadSightMood";
 
     // ------------------------------------------------------------------ 物种·体型（碰撞箱）
@@ -122,36 +175,36 @@ public final class TemplateKeys {
     public static final String SPECIES_VILLAGE_CAT_CONVERSION = "species.villageCatConversionChance";
 
     // ------------------------------------------------------------------ 界 kingdom（模板默认特性）
-    /** 跳跃倍率（脊索界默认玩家 2 倍）。 */
+    /** 跳跃倍率（脊索默认玩家 2 倍）。 */
     public static final String KINGDOM_JUMP_SCALE = "kingdom.jumpScale";
-    /** 是否自动踏上 1 格高方块（脊索界）。 */
+    /** 是否自动踏上 1 格高方块（脊索）。 */
     public static final String FLAG_KINGDOM_AUTO_STEP_UP = "kingdom.autoStepUp";
-    /** 是否免疫暴击（流形界）。 */
+    /** 是否免疫暴击（流形）。 */
     public static final String FLAG_KINGDOM_CRIT_IMMUNE = "kingdom.critImmune";
-    /** 是否免疫摔落（流形界）。 */
+    /** 是否免疫摔落（流形）。 */
     public static final String FLAG_KINGDOM_FALL_IMMUNE = "kingdom.fallImmune";
-    /** 是否不能穿护甲（流形界）。 */
+    /** 是否不能穿护甲（流形）。 */
     public static final String FLAG_KINGDOM_NO_ARMOR = "kingdom.noArmor";
 
     // ------------------------------------------------------------------ 门 classis（模板默认特性）
-    /** 是否带"巢穴附近增益"（外生息门：回复/力量/速度/抗性）。 */
+    /** 是否带"巢穴附近增益"（外生息：回复/力量/速度/抗性）。 */
     public static final String FLAG_CLASSIS_NEST_BUFF = "classis.nestBuff";
 
     // ------------------------------------------------------------------ 科 sectio（战斗模板默认特性）
-    /** 近战是否带流血（绒科）。 */
+    /** 近战是否带流血（绒）。 */
     public static final String FLAG_SECTIO_BLEED = "sectio.bleed";
-    /** 是否周期性闪避弹射物并侧/后位移（绒科）。 */
+    /** 是否周期性闪避弹射物并侧/后位移（绒）。 */
     public static final String FLAG_SECTIO_PROJECTILE_DODGE = "sectio.projectileDodge";
-    /** 近战是否高击退/击飞（鳞科）。 */
+    /** 近战是否高击退/击飞（鳞）。 */
     public static final String FLAG_SECTIO_KNOCKBACK = "sectio.knockback";
-    /** 近战是否为冲锋效果（羽科）。 */
+    /** 近战是否为冲锋效果（羽）。 */
     public static final String FLAG_SECTIO_CHARGE = "sectio.charge";
-    /** 是否空中缓慢下落（羽科）。 */
+    /** 是否空中缓慢下落（羽）。 */
     public static final String FLAG_SECTIO_SLOW_FALL = "sectio.slowFall";
-    /** 攻击是否带中毒/凋零等状态（胶质科）。 */
+    /** 攻击是否带中毒/凋零等状态（胶质）。 */
     public static final String FLAG_SECTIO_STATUS_HIT = "sectio.statusHit";
-    /** 是否拥有额外附肢槽（触肢科；实际槽位由档案 hotbar 描述）。 */
+    /** 是否拥有额外附肢槽（触肢；实际槽位由档案 hotbar 描述）。 */
     public static final String FLAG_SECTIO_EXTRA_LIMBS = "sectio.extraLimbs";
-    /** 是否有范围滞留型效果（菌丝科）。 */
+    /** 是否有范围滞留型效果（菌丝）。 */
     public static final String FLAG_SECTIO_AREA_EFFECT = "sectio.areaEffect";
 }

@@ -4,7 +4,7 @@ import com.linguauniversalis.registry.LURegistries;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
+
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityTicker;
@@ -23,14 +23,19 @@ import javax.annotation.Nullable;
  * - 每 10 tick 对重叠的生物造成 10 点"虚空"（magic 真实伤害）伤害；
  * - 击杀 ≥20 血生物的复活判定在 {@code GirlDeathHandler}（死亡事件）中完成。
  */
-public class SpinaFlorensBlock extends Block implements EntityBlock {
+public class SpinaFlorensBlock extends net.minecraft.world.level.block.BushBlock implements EntityBlock {
 
     public static final float CONTACT_DAMAGE = 10f;
-    private static final VoxelShape SHAPE = Block.box(3.0, 0.0, 3.0, 13.0, 14.0, 13.0);
+    private static final VoxelShape SHAPE = net.minecraft.world.level.block.Block.box(3.0, 0.0, 3.0, 13.0, 14.0, 13.0);
 
     public SpinaFlorensBlock(Properties properties) {
         super(properties);
     }
+
+    // 种植支撑沿用原版 VegetationBlock：`#minecraft:supports_vegetation`
+    // （草方块 / 泥土 / 灰化土 / 菌丝 / 苔藓 / 耕地 / 泥巴 …）—— 花草能种的地方它都能种。
+    // 注意：26.2 的 `#minecraft:dirt` **不含草方块**，自己写判定会种不上去。
+
 
     @Override
     public VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {

@@ -1,29 +1,49 @@
 package com.linguauniversalis.client;
 
+import com.geckolib.renderer.GeoBlockRenderer;
 import com.linguauniversalis.block.CompanionChestBlockEntity;
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
-import net.minecraft.client.renderer.blockentity.ChestRenderer;
-import net.minecraft.client.renderer.blockentity.state.ChestRenderState;
+import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
+import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.world.phys.Vec3;
 
+import javax.annotation.Nullable;
+
 /**
- * 伙伴宝箱的渲染器：复用原版箱子渲染器（{@link ChestRenderer}），**外观强制成末影箱**。
+ * 伙伴宝箱渲染器（GeckoLib）。
  *
- * <p>原版是按方块实体类型选材质的（{@code be instanceof EnderChestBlockEntity} → 末影箱），
- * 我们的箱子是自定义方块实体，所以在抓取渲染状态后把材质字段改成 {@code ENDER_CHEST} ——
- * 这就是"暂时拿末影箱当模型"的实现方式，等美术给正式模型时把本类删掉、换成普通方块模型即可。
- *
- * <p>盖子不播开合动画（{@code getOpenNess} 恒 0），所以不需要方块事件同步。
+ * <p>组合转发给 {@link GeoBlockRenderer}（不能直接继承：它要求渲染状态实现 GeckoLib 的
+ * {@code GeoRenderState}，自定义子类过不了泛型边界 —— 与誊写台同一套写法）。
+ * 朝向由 {@code FACING} 自动绕 Y 旋转；开合动画在 {@link CompanionChestBlockEntity} 的控制器里。
  */
-public class CompanionChestRenderer extends ChestRenderer<CompanionChestBlockEntity> {
+public class CompanionChestRenderer
+        implements BlockEntityRenderer<CompanionChestBlockEntity, BlockEntityRenderState> {
+
+    private final GeoBlockRenderer<CompanionChestBlockEntity, BlockEntityRenderState> geo;
+
     public CompanionChestRenderer(BlockEntityRendererProvider.Context context) {
-        super(context);
+        this.geo = new GeoBlockRenderer<>(context, new CompanionChestGeoModel());
     }
 
     @Override
-    public void extractRenderState(CompanionChestBlockEntity chest, ChestRenderState state, float partialTick,
-            Vec3 cameraPos, net.minecraft.client.renderer.feature.ModelFeatureRenderer.CrumblingOverlay crumbling) {
-        super.extractRenderState(chest, state, partialTick, cameraPos, crumbling);
-        state.material = ChestRenderState.ChestMaterialType.ENDER_CHEST;
+    public BlockEntityRenderState createRenderState() {
+        return this.geo.createRenderState();
+    }
+
+    @Override
+    public void extractRenderState(CompanionChestBlockEntity chest, BlockEntityRenderState state,
+                                   float partialTick, Vec3 cameraPos,
+                                   @Nullable ModelFeatureRenderer.CrumblingOverlay crumbling) {
+        this.geo.extractRenderState(chest, state, partialTick, cameraPos, crumbling);
+    }
+
+    @Override
+    public void submit(BlockEntityRenderState state, PoseStack poseStack,
+                       SubmitNodeCollector collector, CameraRenderState camera) {
+        this.geo.submit(state, poseStack, collector, camera);
     }
 }

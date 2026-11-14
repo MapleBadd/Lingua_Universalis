@@ -8,15 +8,15 @@ import com.linguauniversalis.core.state.MonsterGirlState;
  *
  * <p>目标选择由<b>物种档案 → 纲模板（{@link OrdoTemplates}）</b>驱动。两个距离输入：
  * <ul>
- *   <li>{@code distToNestSq} —— 目标到<b>巢穴方块</b>的距离平方。领地巡游纲（阿拉克涅等）的
+ *   <li>{@code distToNestSq} —— 目标到<b>巢穴方块</b>的距离平方。领地巡游（阿拉克涅等）的
  *       威胁范围以巢心为圆心，<b>不是</b>以魔物娘本体为圆心；无巢（= -1）时不具备守巢攻击；</li>
  *   <li>{@code selfDistSq} —— 目标到魔物娘本体的距离平方（近战/被惹反击/拟态猎亡灵用本体）。</li>
  * </ul>
  *
  * <ul>
- *   <li>阿拉克涅（领地巡游纲）：野生/友善在巢心威胁范围内敌视<b>一切生物</b>（玩家/亡灵/普通生物
+ *   <li>阿拉克涅（领地巡游）：野生/友善在巢心威胁范围内敌视<b>一切生物</b>（玩家/亡灵/普通生物
  *       一视同仁，仅豁免绑玩家）；数值范围来自模板默认 + 档案参数覆盖；</li>
- *   <li>猫又（拟态同化纲）：一般不主动攻击玩家；野生在亡灵狩猎半径内主动猎亡灵；被招惹会反击；</li>
+ *   <li>猫又（拟态同化）：一般不主动攻击玩家；野生在亡灵狩猎半径内主动猎亡灵；被招惹会反击；</li>
  *   <li>心情低落：只攻击近战范围内的非玩家生物，不追远敌；</li>
  *   <li>伙伴：永不主动攻击玩家；被非绑定者招惹自卫反击；</li>
  *   <li>狂暴（enraged）：攻击视野内一切（领地物种无巢/巢毁时进入，见 NestGuard）。</li>
@@ -124,7 +124,7 @@ public final class HostilityRules {
         // 主动行为：交给档案所属纲模板（+ 档案参数）
         OrdoTemplates.OrdoTemplate ordo = OrdoTemplates.of(profile);
 
-        // 领地巡游纲（守卫巢穴）：威胁范围以巢心为圆心，敌视范围内<b>一切生物</b>
+        // 领地巡游（守卫巢穴）：威胁范围以巢心为圆心，敌视范围内<b>一切生物</b>
         // （玩家/亡灵/普通生物一视同仁），仅豁免绑玩家；无巢（NO_NEST）则不守巢。
         if (ordo.guardsTerritoryAgainstPlayers()) {
             if (targetIsBoundOwner) {
